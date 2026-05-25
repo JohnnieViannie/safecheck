@@ -1,0 +1,7 @@
+Django>=4.2
+djangorestframework>=3.14
+psycopg[binary]>=3.1
+mysqlclient>=2.2
+phonenumbers>=8.13
+requests>=2.31
+firebase-admin>=6.5

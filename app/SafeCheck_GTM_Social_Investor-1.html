@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeCheck — GTM Strategy, Social Content & Investor Materials</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--navy:#0B1F3A;--teal:#0A8A78;--teal-lt:#12B09A;--teal-pale:#E6F5F2;--gold:#C9A84C;--gold-lt:#E8C97A;--gold-pale:#FDF8EE;--white:#FAFAF8;--off:#F2F0EB;--grey:#6B7A8D;--dark:#1A2E45;--border:#DDD8D0;--red:#C0392B;--green:#1A7A5E}
+body{font-family:'Sora',sans-serif;background:#080c14;color:var(--dark);line-height:1.6}
+
+/* TAB NAV */
+.tab-nav{background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.07);display:flex;gap:4px;padding:16px 40px 0;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.tab{padding:12px 20px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.4);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;letter-spacing:.06em;transition:all .18s;border-radius:8px 8px 0 0}
+.tab:hover{color:rgba(255,255,255,0.7)}
+.tab.active{color:#4DDBC8;border-bottom-color:#4DDBC8;background:rgba(10,138,120,0.06)}
+
+/* PAGES */
+.page{display:none;min-height:100vh}
+.page.active{display:block}
+
+/* PAGE HEADER */
+.pg-hdr{padding:52px 56px 44px;position:relative;overflow:hidden}
+.pg-hdr::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(10,138,120,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(10,138,120,0.04) 1px,transparent 1px);background-size:32px 32px;pointer-events:none}
+.pg-hdr-inner{position:relative;z-index:1}
+.pg-tag{display:inline-block;border:1px solid rgba(10,138,120,0.38);border-radius:100px;padding:5px 14px;font-size:10px;font-weight:600;color:#4DDBC8;letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px}
+.pg-title{font-family:'Lora',serif;font-size:42px;font-weight:700;color:var(--white);line-height:1.1;margin-bottom:10px}
+.pg-title span{color:#4DDBC8;font-style:italic}
+.pg-sub{font-size:14px;font-weight:300;color:rgba(255,255,255,0.45);max-width:560px;line-height:1.65}
+
+/* BODY AREA */
+.pg-body{padding:0 56px 72px;background:var(--off)}
+
+/* SECTION */
+.sec{margin-bottom:52px;padding-top:40px}
+.sec-num{font-size:9px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:var(--teal);margin-bottom:6px}
+.sec-title{font-family:'Lora',serif;font-size:26px;font-weight:700;color:var(--navy);margin-bottom:5px}
+.sec-sub{font-size:13px;color:var(--grey);margin-bottom:22px;font-weight:300}
+.rule{height:1.5px;background:linear-gradient(to right,var(--teal),transparent);margin-bottom:26px}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:24px 28px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
+.card-hdr{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px}
+.card-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.card-title{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:2px}
+.card-sub{font-size:12px;color:var(--grey);font-weight:300}
+.card-body{font-size:13.5px;color:var(--dark);line-height:1.7}
+.card-body strong{color:var(--navy)}
+
+/* PHASE TIMELINE */
+.timeline{position:relative;padding-left:32px;margin-bottom:32px}
+.timeline::before{content:'';position:absolute;left:10px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--teal),rgba(10,138,120,0.1))}
+.tl-item{position:relative;margin-bottom:28px}
+.tl-dot{position:absolute;left:-26px;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--teal);background:var(--white)}
+.tl-item.done .tl-dot{background:var(--teal)}
+.tl-phase{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--teal);margin-bottom:4px}
+.tl-title{font-size:15px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.tl-body{font-size:13px;color:var(--grey);line-height:1.65}
+.tl-body strong{color:var(--dark)}
+
+/* GRID 2COL */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:24px}
+
+/* HIGHLIGHT BOX */
+.hbox{border-radius:12px;padding:20px 24px;margin-bottom:20px;border-left:4px solid}
+.hbox-teal{background:var(--teal-pale);border-color:var(--teal)}
+.hbox-gold{background:var(--gold-pale);border-color:var(--gold)}
+.hbox-red{background:#FEF0EE;border-color:var(--red)}
+.hbox-title{font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.hbox-body{font-size:13px;color:var(--dark);line-height:1.65}
+.hbox-body strong{color:var(--navy)}
+
+/* SOCIAL POSTS */
+.post-card{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px}
+.post-meta{background:var(--navy);padding:12px 18px;display:flex;justify-content:space-between;align-items:center}
+.post-num{font-size:10px;font-weight:700;color:#4DDBC8;letter-spacing:.15em;text-transform:uppercase}
+.post-platform{display:flex;gap:6px}
+.plat{padding:3px 9px;border-radius:100px;font-size:9px;font-weight:600;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.1)}
+.plat.ig{background:rgba(228,64,95,0.15);color:#E4405F;border-color:rgba(228,64,95,0.3)}
+.plat.li{background:rgba(10,102,194,0.15);color:#0A66C2;border-color:rgba(10,102,194,0.3)}
+.plat.fb{background:rgba(24,119,242,0.15);color:#1877F2;border-color:rgba(24,119,242,0.3)}
+.plat.wa{background:rgba(37,211,102,0.15);color:#25D366;border-color:rgba(37,211,102,0.3)}
+.post-intent{background:rgba(10,138,120,0.08);padding:10px 18px;border-bottom:1px solid var(--border)}
+.post-intent-lbl{font-size:9px;font-weight:700;color:var(--teal);letter-spacing:.18em;text-transform:uppercase;margin-bottom:3px}
+.post-intent-text{font-size:12px;color:var(--grey)}
+.post-copy{padding:18px;font-size:13.5px;color:var(--dark);line-height:1.75;white-space:pre-line}
+.post-copy strong{color:var(--navy)}
+
+/* STAT BADGE */
+.stat-row{display:flex;gap:12px;margin-bottom:24px}
+.stat-b{flex:1;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.stat-n{font-family:'Lora',serif;font-size:28px;font-weight:700;color:var(--teal);display:block;margin-bottom:4px}
+.stat-l{font-size:11px;color:var(--grey);line-height:1.35}
+
+/* INVESTOR SLIDES */
+.slide{background:var(--navy);border-radius:16px;margin-bottom:24px;overflow:hidden}
+.slide-num{background:var(--teal);padding:8px 20px;font-size:10px;font-weight:700;color:var(--navy);letter-spacing:.15em;text-transform:uppercase;display:flex;justify-content:space-between}
+.slide-body{padding:28px 32px}
+.slide-title{font-family:'Lora',serif;font-size:22px;font-weight:700;color:var(--white);margin-bottom:8px;line-height:1.25}
+.slide-sub{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:20px;font-weight:300}
+.slide-content{font-size:13px;color:rgba(255,255,255,0.7);line-height:1.7}
+.slide-content strong{color:#4DDBC8}
+.slide-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.sg-item{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px}
+.sg-num{font-family:'Lora',serif;font-size:24px;font-weight:700;color:#4DDBC8;margin-bottom:4px;display:block}
+.sg-label{font-size:11px;color:rgba(255,255,255,0.5)}
+
+/* PERSONA QUOTE */
+.persona-quote{background:rgba(255,255,255,0.06);border-left:3px solid var(--gold);border-radius:0 10px 10px 0;padding:16px 20px;margin:14px 0}
+.pq-name{font-size:10.5px;font-weight:700;color:var(--gold-lt);margin-bottom:5px;letter-spacing:.08em}
+.pq-text{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.65;font-style:italic}
+
+/* KPI TABLE */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
+.kpi{background:var(--white);border:1px solid var(--border);border-radius:11px;padding:14px;text-align:center}
+.kpi-num{font-size:22px;font-weight:700;color:var(--navy);font-family:'Lora',serif;margin-bottom:3px}
+.kpi-lbl{font-size:10px;color:var(--grey);line-height:1.4}
+.kpi-target{font-size:10px;color:var(--teal);font-weight:600;margin-top:4px}
+</style>
+</head>
+<body>
+
+<!-- TAB NAVIGATION -->
+<div class="tab-nav">
+  <div class="tab active" onclick="showTab('gtm')">🚀 Go-To-Market Strategy</div>
+  <div class="tab" onclick="showTab('social')">📱 Social Media Content</div>
+  <div class="tab" onclick="showTab('investor')">📊 Investor Materials</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 1: GO-TO-MARKET STRATEGY
+═══════════════════════════════════════════ -->
+<div class="page active" id="page-gtm">
+  <div class="pg-hdr" style="background:var(--navy)">
+    <div class="pg-hdr-inner">
+      <div class="pg-tag">Phase 2–3 Deliverable · Area 06 of 08</div>
+      <h1 class="pg-title">SafeCheck<br><span>Go-To-Market</span><br>Playbook</h1>
+      <p class="pg-sub">Operational launch strategy — from the 50-user Kampala beta to 1M users across East Africa. Every growth lever, sequenced and actionable.</p>
+    </div>
+  </div>
+  <div class="pg-body">
+
+    <div class="sec">
+      <div class="sec-num">Market Overview</div>
+      <h2 class="sec-title">The Opportunity in Numbers</h2>
+      <p class="sec-sub">Why SafeCheck wins in this market right now</p>
+      <div class="rule"></div>
+      <div class="stat-row">
+        <div class="stat-b"><span class="stat-n">47M+</span><span class="stat-l">Ugandans who need this product today</span></div>
+        <div class="stat-b"><span class="stat-n">1.4B+</span><span class="stat-l">Africans reachable in 24 months</span></div>
+        <div class="stat-b"><span class="stat-n">8B+</span><span class="stat-l">Global potential users long-term</span></div>
+        <div class="stat-b"><span class="stat-n">$0</span><span class="stat-l">Direct competitors in African market</span></div>
+      </div>
+      <div class="hbox hbox-teal">
+        <div class="hbox-title">The Market Gap SafeCheck Fills</div>
+        <div class="hbox-body">There is currently no affordable, mobile-first dead man's switch product built for the African market. Existing solutions are either hardware-dependent (expensive emergency beacons), enterprise-only (priced for multinationals), or passive (basic ICE contacts that do nothing on their own). <strong>SafeCheck is the only product that fills this gap at a price point accessible to a community health worker in Kisoro or a retired teacher in Ntinda.</strong></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">Launch Phases</div>
+      <h2 class="sec-title">Phase-by-Phase Launch Playbook</h2>
+      <p class="sec-sub">Mapped directly to your existing roadmap — with specific actions, channels, and success metrics per phase</p>
+      <div class="rule"></div>
+
+      <div class="timeline">
+        <div class="tl-item done">
+          <div class="tl-phase">Phase 1 · Months 1–2 · MVP Beta</div>
+          <div class="tl-title">50 Kampala Users — Proof of Concept</div>
+          <div class="tl-body">
+            <strong>Target:</strong> 50 beta users across 5 target personas — community health workers, elderly users, construction supervisors, solo entrepreneurs, journalists.<br><br>
+            <strong>Acquisition channels:</strong> Direct personal outreach via WhatsApp from founding team. Target community leaders, church networks, and professional associations in Kampala. Each team member personally recruits 10 users.<br><br>
+            <strong>Success metrics:</strong> 80%+ of beta users complete onboarding and set up at least one trigger action. Daily check-in completion rate above 70%. Zero false triggers in beta period. Net Promoter Score above 50.<br><br>
+            <strong>Key output:</strong> 5 documented user testimonials — one per persona — for use in Phase 2 press and marketing materials.
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-phase">Phase 2 · Months 3–4 · Full Feature Launch</div>
+          <div class="tl-title">B2C Public Launch + First B2B Pilots</div>
+          <div class="tl-body">
+            <strong>B2C launch channels:</strong> WhatsApp Status campaign (5 story cards per week). Instagram and Facebook organic content — story-led series featuring Grace, Ssekandi, Moses, Amina. Local press release distributed to Monitor, New Vision, Nile Post, and Kampala Sun.<br><br>
+            <strong>B2B pilot targets:</strong> 3 construction or logistics companies in Uganda. Target safety managers directly via LinkedIn and professional networks. Offer a 3-month free Business Safety Plan trial. Pitch deck + one-pager ready for this phase.<br><br>
+            <strong>Word-of-mouth mechanic:</strong> Every triggered alert is a new user acquisition event. Each contact who receives an alert sees the Safebangle brand and is directed to download the app. Ensure the trigger SMS includes a clear app download link.<br><br>
+            <strong>Success metrics:</strong> 500 active B2C users. 2+ B2B pilots live. 3 press articles published. App Store rating above 4.2.
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-phase">Phase 3 · Months 5–6 · Growth & Revenue</div>
+          <div class="tl-title">Telecoms Partnership + B2B Scale</div>
+          <div class="tl-body">
+            <strong>Telecoms partnership pursuit:</strong> MTN Uganda, Airtel Africa, and Safaricom all have digital safety product lines. SafeCheck is a ready-made white-label or co-branded feature. The pitch: SafeCheck adds a life-safety safety layer to their data plans at zero engineering cost. Target partnership managers at MTN Uganda first — they have the most active digital product team in Uganda.<br><br>
+            <strong>Family plan upsell activation:</strong> Every SafeCheck user who adds 3 contacts creates a family network. Prompt the user to invite contacts to download Safebangle directly — "Your contact will see your SafeCheck status in real time if they have the app." This is the family network flywheel.<br><br>
+            <strong>PR campaign launch:</strong> "SafeCheck — Because Silence Shouldn't Mean the Worst." Pitch to BBC Africa, Al Jazeera Africa, and TechCabal. The human stories (Grace, Ssekandi, Amina) are the hook — not the technology.<br><br>
+            <strong>Success metrics:</strong> 2,000+ active users. 1 telecoms partnership MOU signed. 5+ B2B accounts. Monthly Recurring Revenue above UGX 15M.
+          </div>
+        </div>
+
+        <div class="tl-item">
+          <div class="tl-phase">Phase 4 · Months 7–12 · Regional Expansion</div>
+          <div class="tl-title">Kenya, Tanzania, Nigeria — East and West Africa</div>
+          <div class="tl-body">
+            <strong>Kenya first:</strong> The Nairobi-Kampala logistics corridor (Fatima's story) is a natural cross-border expansion case. Partner with a Kenyan logistics association. Swahili localisation ready from Phase 4 language work.<br><br>
+            <strong>Nigeria second:</strong> The 30M+ smallholder farming households (Adaeze's story) are the B2C anchor. The B2B angle is agricultural cooperatives and microfinance institutions with field agents. Hausa and Yoruba localisation required.<br><br>
+            <strong>Investor narrative:</strong> By Month 9 you have Uganda proof, Kenya traction, and Nigeria pipeline — the three largest economies in Sub-Saharan Africa. This is the Series A narrative. Full investor pitch deck (from Area 07 of this package) ready for this stage.<br><br>
+            <strong>Success metrics:</strong> 10,000+ users across 3 markets. Series A raise process initiated. Telecoms partnership live in at least one market.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">B2B Strategy</div>
+      <h2 class="sec-title">B2B Channel Playbook</h2>
+      <p class="sec-sub">Five sectors, five tailored pitches</p>
+      <div class="rule"></div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-icon" style="background:#FEF8EE">🏗️</div><div><div class="card-title">Construction & Mining</div><div class="card-sub">Priority Sector 1 — Uganda</div></div></div>
+          <div class="card-body">Moses's story is the pitch. Construction companies have a duty-of-care obligation but no affordable technical solution. SafeCheck gives them a <strong>UGX 150,000/month per-seat tool</strong> that satisfies their safety policy requirements. Target HSE managers at Stirling Civil Engineering, Roko Construction, and Chinese-owned infrastructure firms active in Uganda. Pitch via the Association of Building and Civil Engineering Contractors Uganda (ABCEC).</div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-icon" style="background:#EAF5F0">🚛</div><div><div class="card-title">Logistics & Transport</div><div class="card-sub">Priority Sector 2 — East Africa</div></div></div>
+          <div class="card-body">Fatima's story (Nairobi-Kampala corridor) is the pitch. Uganda's logistics sector is dominated by 20–30 mid-sized haulage companies. SafeCheck provides fleet safety for solo drivers at a fraction of GPS fleet management costs. Target operations managers via the Federation of East African Freight Forwarders Associations (FEAFFA). Cross-border use case accelerates Kenya expansion.</div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-icon" style="background:#EEF4FE">🏛️</div><div><div class="card-title">NGOs & International Organisations</div><div class="card-sub">Priority Sector 3 — Uganda</div></div></div>
+          <div class="card-body">Grace's story is the pitch. Uganda hosts 300+ registered NGOs with field workers in remote areas. SafeCheck provides <strong>duty-of-care compliance</strong> for field staff at a cost accessible even to small NGOs. Key targets: international NGOs (IRC, MSF, Save the Children) with Uganda country offices, and domestic NGOs working in Karamoja, West Nile, and Kisoro.</div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-icon" style="background:#FEF0EE">📰</div><div><div class="card-title">Media & Journalism Organisations</div><div class="card-sub">Priority Sector 4 — Uganda + Africa</div></div></div>
+          <div class="card-body">Amina's story is the pitch. Uganda's press freedom ranking creates real safety needs for journalists. SafeCheck's Document Vault feature is uniquely valuable for investigative journalists — it is a product no other safety app offers. Target the Uganda Journalists Association and Committee to Protect Journalists (CPJ) Africa desk. A CPJ endorsement would be transformative for press coverage.</div>
+        </div>
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-hdr"><div class="card-icon" style="background:var(--teal-pale)">📱</div><div><div class="card-title">Telecoms Partnerships — MTN Uganda, Airtel Africa, Safaricom</div><div class="card-sub">Highest Value Channel · Phase 3</div></div></div>
+          <div class="card-body">All three telecoms have active digital safety product lines. The pitch to MTN Uganda: <strong>"Add SafeCheck to your MTN Pulse data bundle as a white-label safety feature for UGX 2,000/month per subscriber. We provide the technology. You provide the distribution."</strong> At 1% penetration of MTN Uganda's 17M subscribers, this is 170,000 users from a single partnership. The key contact is MTN Uganda's Head of Digital Products. The route in is through the Digital Uganda initiative or a direct warm introduction via the Uganda Communications Commission.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">KPI Framework</div>
+      <h2 class="sec-title">Measurement Dashboard — Key Metrics by Phase</h2>
+      <div class="rule"></div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-num">80%</div><div class="kpi-lbl">Onboarding completion rate</div><div class="kpi-target">Target: Month 2</div></div>
+        <div class="kpi"><div class="kpi-num">70%</div><div class="kpi-lbl">Daily check-in completion rate</div><div class="kpi-target">Target: Month 2</div></div>
+        <div class="kpi"><div class="kpi-num">500</div><div class="kpi-lbl">Active B2C users</div><div class="kpi-target">Target: Month 4</div></div>
+        <div class="kpi"><div class="kpi-num">3</div><div class="kpi-lbl">B2B pilots live</div><div class="kpi-target">Target: Month 4</div></div>
+        <div class="kpi"><div class="kpi-num">2,000</div><div class="kpi-lbl">Total active users</div><div class="kpi-target">Target: Month 6</div></div>
+        <div class="kpi"><div class="kpi-num">15M</div><div class="kpi-lbl">UGX MRR</div><div class="kpi-target">Target: Month 6</div></div>
+        <div class="kpi"><div class="kpi-num">10,000</div><div class="kpi-lbl">Users across 3 markets</div><div class="kpi-target">Target: Month 12</div></div>
+        <div class="kpi"><div class="kpi-num">50+</div><div class="kpi-lbl">Net Promoter Score</div><div class="kpi-target">Maintained throughout</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 2: SOCIAL MEDIA CONTENT
+═══════════════════════════════════════════ -->
+<div class="page" id="page-social">
+  <div class="pg-hdr" style="background:linear-gradient(135deg,#0B1F3A 0%,#0A2820 100%)">
+    <div class="pg-hdr-inner">
+      <div class="pg-tag">Phase 3 Deliverable · Area 08 of 08</div>
+      <h1 class="pg-title">SafeCheck<br><span>Social Content</span><br>Pack</h1>
+      <p class="pg-sub">30-day launch campaign — story-led posts, WhatsApp content, press materials, and the full "Because Silence Shouldn't Mean the Worst" campaign concept.</p>
+    </div>
+  </div>
+  <div class="pg-body">
+
+    <div class="sec">
+      <div class="sec-num">Campaign Concept</div>
+      <h2 class="sec-title">"Because Silence Shouldn't Mean the Worst"</h2>
+      <p class="sec-sub">The campaign idea that drives all content across all channels</p>
+      <div class="rule"></div>
+      <div class="hbox hbox-teal">
+        <div class="hbox-title">Campaign Insight</div>
+        <div class="hbox-body">Every person who has ever anxiously waited for a call back from a parent, partner, or colleague who was unreachable understands this product immediately. The campaign does not sell features — it sells the relief of knowing. The tagline is not about technology. It is about the moment when your phone rings and it's them, and you can breathe again. <strong>SafeCheck is the product that makes that call unnecessary — because someone was always watching.</strong></div>
+      </div>
+      <div class="g3">
+        <div class="card"><div class="card-title">Campaign Tagline</div><div class="card-body" style="margin-top:8px;font-size:15px;font-weight:600;color:var(--teal)">"Because Silence Shouldn't Mean the Worst."</div></div>
+        <div class="card"><div class="card-title">Secondary Line</div><div class="card-body" style="margin-top:8px;font-size:14px;font-weight:600;color:var(--navy)">"The bracelet protects you in the moment. SafeCheck protects you in the silence."</div></div>
+        <div class="card"><div class="card-title">Call to Action</div><div class="card-body" style="margin-top:8px;font-size:14px;font-weight:600;color:var(--navy)">"Set up your SafeCheck today. Takes 3 minutes. Download Safebangle."</div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">Week 1 — Launch Posts</div>
+      <h2 class="sec-title">Launch Week Social Posts</h2>
+      <div class="rule"></div>
+
+      <div class="post-card">
+        <div class="post-meta"><div class="post-num">POST 01 — Day 1 Launch</div><div class="post-platform"><span class="plat ig">Instagram</span><span class="plat fb">Facebook</span><span class="plat li">LinkedIn</span></div></div>
+        <div class="post-intent"><div class="post-intent-lbl">Intent</div><div class="post-intent-text">Brand introduction — who SafeCheck is for and why it exists</div></div>
+        <div class="post-copy">
+Introducing <strong>SafeCheck by Safebangle</strong> 🛡️
+
+Every day in Uganda, people go to work alone, live alone, travel alone — and the people who love them have no way of knowing they're okay.
+
+A health worker in Kisoro. A retired teacher in Ntinda. A journalist in Gulu. A truck driver on the Kampala road.
+
+<strong>SafeCheck is built for them.</strong>
+
+It sends a simple daily check-in. If you don't respond, it alerts the people who need to know — with your last known location, exactly when they need it.
+
+No hardware required. Works on any smartphone. Free to start.
+
+Because silence shouldn't mean the worst.
+
+🔗 Download Safebangle and set up SafeCheck in 3 minutes.
+Link in bio.
+
+#SafeCheck #Safebangle #Uganda #Safety #KampalaLife #BecauseSilence</div>
+      </div>
+
+      <div class="post-card">
+        <div class="post-meta"><div class="post-num">POST 02 — Day 2 — Grace's Story</div><div class="post-platform"><span class="plat ig">Instagram</span><span class="plat fb">Facebook</span><span class="plat wa">WhatsApp</span></div></div>
+        <div class="post-intent"><div class="post-intent-lbl">Intent</div><div class="post-intent-text">Story-led post — Field worker persona. Highest shareability — this is the post that spreads in health worker networks.</div></div>
+        <div class="post-copy">
+Meet Grace. 👩‍⚕️
+
+She travels alone between remote villages in Kisoro. Her routes take her through areas with no road, no phone signal, and no other people for hours.
+
+Her husband knows she left at dawn. He doesn't know when she'll be back. He worries every day.
+
+<strong>Last week, Grace set up SafeCheck.</strong>
+
+Now every evening at 6PM, her phone asks: are you okay?
+One tap. James gets nothing — because she's fine.
+
+If she ever doesn't tap...
+James gets an SMS with her last location.
+Her supervisor gets an alert.
+
+She set it up in 3 minutes. She hasn't thought about it since.
+James sleeps better.
+
+Grace works in Kisoro. But she could be anywhere in Uganda — or anywhere in the world.
+
+Is there a Grace in your life?
+
+💬 Share this with her.
+🔗 Download Safebangle. Link in bio.
+
+#SafeCheck #Uganda #HealthWorkers #WomenSafety #KisoroUganda</div>
+      </div>
+
+      <div class="post-card">
+        <div class="post-meta"><div class="post-num">POST 03 — Day 4 — Ssekandi's Story</div><div class="post-platform"><span class="plat ig">Instagram</span><span class="plat fb">Facebook</span><span class="plat wa">WhatsApp</span></div></div>
+        <div class="post-intent"><div class="post-intent-lbl">Intent</div><div class="post-intent-text">Elderly user persona — targets family members who worry about parents. Tag-a-parent mechanics. Highest conversion for Family Plan.</div></div>
+        <div class="post-copy">
+His children call every day. Some days they miss.
+
+Ssekandi is 71. Lives alone in Ntinda after his wife passed. Chronic heart condition. His children are in Entebbe and Jinja.
+
+Last year, he fell asleep and nobody reached him for 7 hours. His daughter drove to Kampala in a panic. He was napping.
+
+<strong>"But next time," she said, "it might not be a nap."</strong>
+
+They set up SafeCheck last month.
+
+Every morning at 8AM, Ssekandi gets a gentle tap on his phone.
+He taps back. His children see nothing — because he's fine.
+
+If he ever doesn't tap by 10AM...
+They both get a WhatsApp message.
+They know exactly where he is.
+
+He still has his independence.
+They have peace of mind.
+
+That's all they wanted.
+
+👇 Tag a parent or grandparent who lives alone.
+🔗 Download Safebangle — link in bio.
+
+#SafeCheck #Elderlycare #Uganda #Kampala #FamilySafety #Safebangle</div>
+      </div>
+
+      <div class="post-card">
+        <div class="post-meta"><div class="post-num">POST 04 — Day 7 — The B2B Post</div><div class="post-platform"><span class="plat li">LinkedIn</span></div></div>
+        <div class="post-intent"><div class="post-intent-lbl">Intent</div><div class="post-intent-text">Professional / B2B post — targeted at safety managers, HR directors, and NGO leads. Drives B2B inbound enquiries.</div></div>
+        <div class="post-copy">
+If your company has field staff working alone in Uganda, you have a duty of care.
+
+Most companies in Uganda have a basic safety policy. Very few have a technical system to back it up.
+
+<strong>SafeCheck by Safebangle</strong> gives you that system — for as little as UGX 150,000 per month for your entire team.
+
+What you get:
+✅ Daily check-ins for every lone worker
+✅ Automated GPS alerts to supervisors on non-response  
+✅ Audit logs for every check-in event
+✅ WhatsApp + SMS delivery — works on any phone
+✅ No hardware required
+
+We're currently onboarding pilot companies in construction, logistics, and field services.
+
+If your organisation works with people who work alone — let's talk.
+
+📩 Reach out directly or email: [contact@safebangle.com]
+🔗 See our Business Safety Plan: [link]
+
+#SafeCheck #WorkplaceSafety #Uganda #SafetyAtWork #LoneWorker #Safebangle</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">Weeks 2–4 Content Calendar</div>
+      <h2 class="sec-title">30-Day Content Calendar</h2>
+      <div class="rule"></div>
+      <div class="g2">
+        <div class="card"><div class="card-title" style="color:var(--teal)">Week 2 — Product Education</div><div class="card-body" style="margin-top:10px">
+          <strong>Post 5:</strong> "What is a dead man's switch? And why does it matter for you?" — Education post, long-form, demystifies the concept without using scary language.<br><br>
+          <strong>Post 6:</strong> Feature spotlight — Document Vault. Amina's journalism story. Target journalists, activists, lawyers. LinkedIn + Instagram.<br><br>
+          <strong>Post 7:</strong> "How Grace set up SafeCheck in 3 minutes" — Step-by-step walkthrough. Story format. Drives app downloads.
+        </div></div>
+        <div class="card"><div class="card-title" style="color:var(--teal)">Week 3 — Social Proof & Referral</div><div class="card-body" style="margin-top:10px">
+          <strong>Post 8:</strong> First beta user testimonial — real quote from a Kampala user. Handwritten quote card visual. Authentic, unpolished.<br><br>
+          <strong>Post 9:</strong> "Tag someone who works alone" — referral mechanic. UGX 5,000 airtime incentive for every referral who downloads. WhatsApp + Facebook.<br><br>
+          <strong>Post 10:</strong> Moses's construction site story. B2B awareness. Target construction and mining WhatsApp groups.
+        </div></div>
+        <div class="card"><div class="card-title" style="color:var(--teal)">Week 4 — Momentum & PR</div><div class="card-body" style="margin-top:10px">
+          <strong>Post 11:</strong> "X users protected in our first month" — milestone announcement. Includes testimonial compilation video (if available).<br><br>
+          <strong>Post 12:</strong> Press release pickup amplification — share any media coverage organically. BBC Africa / TechCabal mentions multiply reach 10x.<br><br>
+          <strong>Post 13:</strong> WhatsApp Status series — all 5 status cards from the Status Pack deployed over 5 consecutive days.
+        </div></div>
+        <div class="card"><div class="card-title" style="color:var(--teal)">WhatsApp Strategy</div><div class="card-body" style="margin-top:10px">
+          WhatsApp is the dominant platform in Uganda (85%+ smartphone users). SafeCheck's growth strategy should treat WhatsApp as the primary channel, not secondary.<br><br>
+          <strong>Tactics:</strong> Status card series (5 cards per week). Targeted group posts to community WhatsApp groups (church, SACCO, professional associations). Every triggered alert includes a WhatsApp-first response path.
+        </div></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">Press Release</div>
+      <h2 class="sec-title">Uganda Launch Press Release</h2>
+      <div class="rule"></div>
+      <div class="card">
+        <div style="font-family:'Lora',serif;font-size:18px;font-weight:700;color:var(--navy);margin-bottom:6px">FOR IMMEDIATE RELEASE</div>
+        <div style="font-size:12px;color:var(--grey);margin-bottom:20px">Contact: [Name] · [email] · +256 XXX XXXXXX</div>
+        <div style="font-size:17px;font-weight:700;color:var(--navy);margin-bottom:8px;font-family:'Lora',serif">Kampala-Based Tech Startup Launches Uganda's First Personal Safety Check-In App</div>
+        <div style="font-size:13px;font-weight:600;color:var(--teal);margin-bottom:16px">SafeCheck by Safebangle monitors whether users are okay — and acts automatically if they are not</div>
+        <div style="font-size:13.5px;color:var(--dark);line-height:1.75">
+          <strong>KAMPALA, Uganda — [DATE]</strong> — Safebangle Technologies today launched SafeCheck, a new safety feature for the Safebangle mobile application that automatically alerts emergency contacts when a user fails to respond to a periodic check-in. The product is the first of its kind designed specifically for the African market.<br><br>
+          SafeCheck works by sending users a periodic notification — daily, weekly, or monthly — asking them to confirm they are safe. If the user does not respond within a configurable grace period, the system automatically sends SMS alerts, shares GPS coordinates, and executes other pre-configured actions on the user's behalf.<br><br>
+          <em>"We built SafeCheck for Grace, the community health worker who travels alone in Kisoro. For Ssekandi, the retired teacher in Ntinda whose children worry every day. For Amina, the journalist in Gulu who covers sensitive stories in isolated locations,"</em> said [Founder Name], CEO of Safebangle Technologies. <em>"These people have always needed this product. Until now, it did not exist for them."</em><br><br>
+          SafeCheck is available now as part of the Safebangle app on Android and iOS. The basic tier is free, with premium plans starting at UGX 15,000 per month. Enterprise plans for businesses with field workers start at UGX 150,000 per month.<br><br>
+          <strong>About Safebangle Technologies:</strong> Safebangle Technologies is a Kampala-based safety technology company building personal and professional safety products for the African market. The company's Safebangle hardware bracelet provides real-time panic button and fall detection capabilities. SafeCheck is the company's first software-only safety product.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     PAGE 3: INVESTOR MATERIALS
+═══════════════════════════════════════════ -->
+<div class="page" id="page-investor">
+  <div class="pg-hdr" style="background:linear-gradient(160deg,#071428 0%,#0A2820 100%)">
+    <div class="pg-hdr-inner">
+      <div class="pg-tag">Phase 3–4 Deliverable · Area 07 of 08</div>
+      <h1 class="pg-title">SafeCheck<br><span>Investor</span><br>Pitch Materials</h1>
+      <p class="pg-sub">10-slide pitch deck narrative, executive one-pager, demo script, and market sizing story. Built to raise Series A from East African and impact investors.</p>
+    </div>
+  </div>
+  <div class="pg-body">
+
+    <div class="sec">
+      <div class="sec-num">Pitch Deck — 10 Slides</div>
+      <h2 class="sec-title">Slide-by-Slide Narrative</h2>
+      <p class="sec-sub">Complete content for each slide — headlines, talking points, data, and design guidance</p>
+      <div class="rule"></div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 01 — The Hook</span><span>15 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">"What happens when you can't press the button?"</div>
+          <div class="slide-sub">Open with a problem, not a company name</div>
+          <div class="slide-content">
+            <strong>Visual:</strong> Single photo. Grace on a mountain trail in Kisoro. No text except the question.<br><br>
+            <strong>Talking point:</strong> "The Safebangle bracelet is excellent at what it does — you press a button, help comes. But what about the person who never gets the chance to press anything? That person needs something different. That person needs SafeCheck."
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 02 — The Problem</span><span>45 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">47 million Ugandans. Zero affordable safety check-in solutions.</div>
+          <div class="slide-sub">Market gap, not feature list</div>
+          <div class="slide-content">
+            <strong>Key data points on slide:</strong><br>
+            — 47M+ Ugandans who need this<br>
+            — 30M+ smallholder farmers in Nigeria who work alone<br>
+            — Millions of lone workers across East and West Africa with no safety net<br><br>
+            <strong>Talking point:</strong> "Existing solutions are either hardware-dependent — expensive beacons designed for Western hikers — or enterprise-only, priced for multinationals. There is nothing for Grace. Nothing for Ssekandi. Nothing for Moses. We are building it."
+          </div>
+          <div class="slide-grid">
+            <div class="sg-item"><span class="sg-num">$0</span><span class="sg-label">Direct competitors in African market for this price point</span></div>
+            <div class="sg-item"><span class="sg-num">8B+</span><span class="sg-label">Global potential users for a product like this</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 03 — The People</span><span>60 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">We built this for six specific people. And everyone who knows them.</div>
+          <div class="slide-sub">Human stories as the product brief</div>
+          <div class="slide-content">Show all 6 personas in a single visual grid. One sentence each.</div>
+          <div class="slide-grid">
+            <div class="sg-item"><span style="font-size:20px">👩‍⚕️</span><span class="sg-label" style="margin-top:6px;display:block"><strong style="color:#fff">Grace</strong> — Community health worker, Kisoro. Travels alone. No signal for hours.</span></div>
+            <div class="sg-item"><span style="font-size:20px">🧓</span><span class="sg-label" style="margin-top:6px;display:block"><strong style="color:#fff">Ssekandi</strong> — Retired teacher, Ntinda. Lives alone. Children 100km away.</span></div>
+            <div class="sg-item"><span style="font-size:20px">🏗️</span><span class="sg-label" style="margin-top:6px;display:block"><strong style="color:#fff">Moses</strong> — Construction supervisor, Mbale. Works overnight at remote sites.</span></div>
+            <div class="sg-item"><span style="font-size:20px">📰</span><span class="sg-label" style="margin-top:6px;display:block"><strong style="color:#fff">Amina</strong> — Journalist, Gulu. Covers sensitive stories in isolated locations.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 04 — The Solution</span><span>45 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">SafeCheck: the world's most human dead man's switch.</div>
+          <div class="slide-sub">Simple mechanism, profound impact</div>
+          <div class="slide-content">
+            <strong>How it works (one visual flow):</strong><br>
+            Schedule check-in → App sends notification → User taps once → Nothing happens (they are safe) → User doesn't tap → Grace period countdown → Alert fires → Contacts notified with GPS → Actions execute in sequence<br><br>
+            <strong>Talking point:</strong> "We call it a dead man's switch. But it feels like a text from a friend who cares about you. That is the product we built — not a system, not a tracker. A daily tap that says: I'm okay. And the knowledge that if you can't tap, someone will come."
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 05 — Traction</span><span>30 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">Early signal: [X] beta users, [Y] check-ins completed, zero churn.</div>
+          <div class="slide-sub">Numbers matter. So does the story behind them.</div>
+          <div class="slide-content">
+            <strong>[Fill with actual beta data before presenting]</strong><br><br>
+            Key metrics to show: Active users, daily check-in completion rate, NPS score, any B2B pilots, press mentions.<br><br>
+            <strong>Talking point:</strong> "Our daily check-in completion rate is [X]%. For context, WhatsApp's daily open rate is around 70%. Our users open our app every single day because their safety depends on it. That is the strongest retention mechanic we know of."
+          </div>
+          <div class="slide-grid">
+            <div class="sg-item"><span class="sg-num" style="color:var(--gold-lt)">[X]%</span><span class="sg-label">Daily check-in completion rate</span></div>
+            <div class="sg-item"><span class="sg-num" style="color:var(--gold-lt)">[Y]+</span><span class="sg-label">Check-ins completed in beta</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 06 — Business Model</span><span>30 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">Four revenue tiers. Free to UGX 400,000/month. B2B from UGX 150,000/seat.</div>
+          <div class="slide-sub">Simple, scalable, defensible</div>
+          <div class="slide-content">
+            <strong>Free:</strong> Basic check-in (1 contact, 1 action) — acquisition layer<br>
+            <strong>SafeCheck Pro (UGX 15,000/mo):</strong> Unlimited contacts, full Trigger Engine, Document Vault<br>
+            <strong>Family Plan (UGX 35,000/mo):</strong> Up to 5 family members, shared dashboard<br>
+            <strong>Business Plan (from UGX 150,000/mo):</strong> Per-seat enterprise licensing, audit logs<br><br>
+            <strong>Unit economics at scale:</strong> At 10,000 users with 40% on paid plans, average ARPU UGX 20,000/month = UGX 80M MRR. B2B contracts add on top.
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 07 — Market Sizing</span><span>30 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">Uganda is the proof. East Africa is the market. The world is the opportunity.</div>
+          <div class="slide-sub">SAM / TAM / SOM built bottom-up</div>
+          <div class="slide-content">
+            <strong>SOM (Year 1–2 — Uganda):</strong> 10,000 users at UGX 20,000 average ARPU = UGX 2.4B ARR<br>
+            <strong>SAM (Year 2–4 — East Africa):</strong> Kenya + Tanzania + Uganda. 200,000 users = ~$15M ARR<br>
+            <strong>TAM (Global):</strong> Solo workers, elderly care, travellers, journalists globally. Conservative estimate: 50M potential users at $5/month = $3B ARR<br><br>
+            <strong>Comparable exits:</strong> Life360 (family safety) IPO'd at $1.5B. Medical Guardian acquired at $1.5B. SafeCheck addresses a larger, less served market.
+          </div>
+          <div class="slide-grid">
+            <div class="sg-item"><span class="sg-num">$3B</span><span class="sg-label">Global TAM — safety check-in market</span></div>
+            <div class="sg-item"><span class="sg-num">$15M</span><span class="sg-label">East Africa SAM — Year 3 target</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 08 — Growth Mechanics</span><span>30 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">Every triggered alert is a new user acquisition event.</div>
+          <div class="slide-sub">Built-in viral growth that no paid campaign can replicate</div>
+          <div class="slide-content">
+            <strong>The flywheel:</strong> User sets up SafeCheck → adds 2–3 contacts → contacts receive alerts → contacts download app to monitor → contacts set up their own SafeCheck → each adds 2–3 more contacts → repeat<br><br>
+            <strong>Average contacts per user:</strong> 2.3 (target). Each contact who downloads the app is worth 2.3 more. This is exponential organic growth.<br><br>
+            <strong>B2B accelerates B2C:</strong> One construction company with 50 workers on SafeCheck Business Plan = 50 users who go home and set up personal SafeCheck for their families.
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 09 — The Team</span><span>20 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">Built by people who know this problem personally.</div>
+          <div class="slide-sub">[Team bios — to be completed by Safebangle team]</div>
+          <div class="slide-content">
+            Guidance: Lead with founders' connection to the problem, not credentials. Investors in impact-adjacent products want to know that the team understands the user. If any founders have personal experience with safety emergencies, lone work, or caring for elderly parents — that story belongs on this slide.<br><br>
+            Include: Founder(s), lead engineer, any advisors with relevant credibility (telecom, safety, Uganda government connections).
+          </div>
+        </div>
+      </div>
+
+      <div class="slide">
+        <div class="slide-num"><span>Slide 10 — The Ask</span><span>30 seconds</span></div>
+        <div class="slide-body">
+          <div class="slide-title">We are raising [X]. Here is exactly how we use it.</div>
+          <div class="slide-sub">Specific, credible, milestone-linked</div>
+          <div class="slide-content">
+            <strong>Suggested use of funds (to be confirmed with team):</strong><br>
+            — Engineering (40%): Full Trigger Engine, Document Vault, iOS parity<br>
+            — Growth (30%): B2B sales team, PR campaign, WhatsApp marketing<br>
+            — Operations (20%): Twilio/SendGrid/Firebase scale costs, legal compliance<br>
+            — Reserve (10%): Working capital<br><br>
+            <strong>18-month milestones funded by this raise:</strong><br>
+            — 10,000 active users across Uganda, Kenya, Tanzania<br>
+            — 1 telecoms partnership live<br>
+            — UGX 80M+ MRR<br>
+            — Series A ready with proven unit economics
+          </div>
+          <div class="persona-quote">
+            <div class="pq-name">Closing Line — say this last, before you stop talking:</div>
+            <div class="pq-text">"Grace in Kisoro doesn't know what venture capital is. She doesn't need to. She needs her husband to know she got home safely. That's what this investment funds. Let's make it happen."</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-num">Executive One-Pager</div>
+      <h2 class="sec-title">One-Page Executive Summary</h2>
+      <p class="sec-sub">For cold outreach, email attachments, and warm introduction follow-ups</p>
+      <div class="rule"></div>
+      <div class="card" style="border-left:4px solid var(--teal)">
+        <div style="font-family:'Lora',serif;font-size:20px;font-weight:700;color:var(--navy);margin-bottom:4px">SafeCheck by Safebangle Technologies</div>
+        <div style="font-size:13px;color:var(--teal);font-weight:600;margin-bottom:20px">Uganda's First Personal Safety Check-In Platform</div>
+        <div class="g2" style="margin-bottom:20px">
+          <div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">THE PROBLEM</div><div style="font-size:13px;color:var(--dark);line-height:1.65">47M+ Ugandans — lone workers, elderly people living alone, women, field professionals — have no affordable way to ensure someone knows they are okay. When an emergency happens and they cannot call for help, there is nothing.</div></div>
+          <div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">THE SOLUTION</div><div style="font-size:13px;color:var(--dark);line-height:1.65">SafeCheck sends a periodic check-in notification. One tap confirms safety. Non-response triggers an automated sequence: SMS alerts, GPS location sharing, document release — executed on the user's behalf when they cannot act.</div></div>
+          <div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">BUSINESS MODEL</div><div style="font-size:13px;color:var(--dark);line-height:1.65">Free basic tier drives acquisition. SafeCheck Pro at UGX 15,000/month. Family Plan at UGX 35,000/month. Business Safety Plan from UGX 150,000/month per-seat. Telecoms white-label partnerships in development.</div></div>
+          <div><div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px">MARKET OPPORTUNITY</div><div style="font-size:13px;color:var(--dark);line-height:1.65">Uganda: 47M+ addressable users. East Africa: 1.4B reachable in 24 months. Global TAM: 8B+ potential users. No direct competitor in the African market at this price point.</div></div>
+        </div>
+        <div style="background:var(--navy);border-radius:10px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:13px;font-weight:600;color:#fff">Raising: [Amount] · Use: Engineering, Growth, Scale · Milestone: 10,000 users, 3 markets, Series A ready</div>
+          <div style="font-size:13px;color:#4DDBC8;font-weight:600;white-space:nowrap;margin-left:20px">[contact@safebangle.com]</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>{ if(t.getAttribute('onclick').includes(id)) t.classList.add('active'); });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

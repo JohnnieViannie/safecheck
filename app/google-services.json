@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "780122444136",
+    "project_id": "safecheck-c4fa6",
+    "storage_bucket": "safecheck-c4fa6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:780122444136:android:d0c9d2769084feb5fd46dd",
+        "android_client_info": {
+          "package_name": "com.safecheck.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDRrE8UjiAImAYLnwX1QjMcRaDvKDGbnfA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
