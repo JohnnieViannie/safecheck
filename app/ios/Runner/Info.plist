@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>SafeBangle</string>
+	<string>Safe Check</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -49,11 +49,16 @@
 	<string>SafeCheck needs access to the microphone to confirm you are safe during scheduled check-ins.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>SafeCheck needs access to your location to alert your next of kin if you miss a check-in.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>SafeCheck uses your location in the background to share your position with your next of kin if you miss a check-in.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>SafeCheck uses your location in the background to share your position with your next of kin if you miss a check-in.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>voip</string>
 		<string>remote-notification</string>
 		<string>processing</string>
+		<string>location</string>
 	</array>
 </dict>
 </plist>

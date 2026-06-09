@@ -2,6 +2,7 @@ class UserModel {
   UserModel({
     required this.uid,
     required this.onboardingCompleted,
+    this.fullName,
     this.email,
     this.phoneNumber,
     this.userType,
@@ -22,6 +23,7 @@ class UserModel {
 
   final String uid;
   final bool onboardingCompleted;
+  final String? fullName;
   final String? email;
   final String? phoneNumber;
   final String? userType;
@@ -42,9 +44,19 @@ class UserModel {
   /// The best display identifier: prefers email, falls back to phone, then uid.
   String get displayIdentifier => email ?? phoneNumber ?? uid;
 
+  /// First name for greetings — uses [fullName], not email.
+  String get firstName {
+    final String? name = fullName?.trim();
+    if (name != null && name.isNotEmpty) {
+      return name.split(RegExp(r'\s+')).first;
+    }
+    return 'there';
+  }
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'uid': uid,
+      'fullName': fullName,
       'email': email,
       'phoneNumber': phoneNumber,
       'onboardingCompleted': onboardingCompleted,
@@ -68,6 +80,7 @@ class UserModel {
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
       uid: map['uid'] as String? ?? '',
+      fullName: map['fullName'] as String? ?? map['full_name'] as String?,
       email: map['email'] as String?,
       phoneNumber:
           map['phoneNumber'] as String? ?? map['phone_number'] as String?,

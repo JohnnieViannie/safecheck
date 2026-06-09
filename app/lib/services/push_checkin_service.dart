@@ -5,10 +5,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:safecheck/firebase_options.dart';
 import 'package:safecheck/services/api_service.dart';
 import 'package:safecheck/services/auth_service.dart';
+import 'package:safecheck/utils/app_log.dart';
 import 'package:safecheck/services/background_alarm_init.dart';
+import 'package:safecheck/services/call_dedup_service.dart';
 import 'package:safecheck/services/endpoints.dart';
 
 /// Handles server-driven FCM pushes that wake the app for check-in calls.
@@ -45,11 +48,24 @@ class PushCheckinService {
     final String frequency = data['frequency']?.toString() ?? 'Daily';
     final String checkinTime = data['checkinTime']?.toString() ?? '18:00';
     final bool snoozed = data['snoozed']?.toString() == 'true';
-    final int alarmId = int.tryParse(data['alarmId']?.toString() ?? '') ?? (snoozed ? 1 : 0);
+    final int alarmId =
+        int.tryParse(data['alarmId']?.toString() ?? '') ?? (snoozed ? 1 : 0);
     final DateTime scheduledFor = DateTime.tryParse(
           data['scheduledFor']?.toString() ?? '',
         ) ??
         DateTime.now();
+
+    final bool show = await CallDedupService.instance.shouldShowCall(
+      callKitId: callKitId,
+      scheduledFor: scheduledFor,
+    );
+    if (!show) return;
+
+    if (fromBackground) {
+      try {
+        await FlutterRingtonePlayer().playAlarm();
+      } catch (_) {}
+    }
 
     final CallKitParams params = CallKitParams(
       id: callKitId,
@@ -140,6 +156,10 @@ class PushCheckinService {
     }
 
     try {
+      if (!_initialized) {
+        await initialize();
+      }
+
       final FirebaseMessaging messaging = FirebaseMessaging.instance;
       final String? token = await messaging.getToken();
       if (token == null || token.isEmpty) {
@@ -156,7 +176,7 @@ class PushCheckinService {
         },
       );
       if (response.statusCode != 200 && response.statusCode != 201) {
-        debugPrint('register-push failed: ${response.statusCode} ${response.body}');
+        appLog('register-push failed: ${response.statusCode} ${response.body}');
       }
 
       messaging.onTokenRefresh.listen((String newToken) async {
@@ -170,7 +190,22 @@ class PushCheckinService {
         );
       });
     } catch (error) {
-      debugPrint('FCM registerTokenIfLoggedIn error: $error');
+      appLog('FCM registerTokenIfLoggedIn error: $error');
+    }
+  }
+
+  Future<void> unregisterTokenIfLoggedIn() async {
+    final String? uid = AuthService.instance.currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      return;
+    }
+    try {
+      await ApiService.instance.post(
+        Endpoints.unregisterPushToken,
+        body: <String, dynamic>{'uid': uid},
+      );
+    } catch (error) {
+      appLog('FCM unregister error: $error');
     }
   }
 }

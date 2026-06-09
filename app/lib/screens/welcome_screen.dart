@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:safecheck/config/app_config.dart';
+import 'package:safecheck/screens/create_account_screen.dart';
 import 'package:safecheck/screens/email_input_screen.dart';
-import 'package:safecheck/screens/home_screen.dart';
-import 'package:safecheck/screens/onboarding_screen.dart';
+import 'package:safecheck/utils/app_log.dart';
+import 'package:safecheck/utils/auth_navigation.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:safecheck/services/auth_service.dart';
-import 'package:safecheck/services/permissions_service.dart';
 import 'package:safecheck/theme.dart';
 import 'package:safecheck/widgets/app_logo.dart';
 import 'package:safecheck/widgets/custom_button.dart';
@@ -53,6 +55,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.dispose();
   }
 
+  Future<void> _openUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open $url')),
+      );
+    }
+  }
+
   Future<void> _onContinueWithEmail() async {
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 250));
@@ -62,7 +73,18 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const EmailInputScreen(skipIfLoggedIn: false),
+        builder: (_) => const EmailInputScreen(
+          skipIfLoggedIn: false,
+          mode: AuthFlowMode.login,
+        ),
+      ),
+    );
+  }
+
+  void _onCreateAccount() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const CreateAccountScreen(),
       ),
     );
   }
@@ -71,19 +93,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     setState(() => _googleLoading = true);
     await AuthService.instance.signInWithGoogle(
       onSuccess: (user) async {
-        await PermissionsService.instance.requestPostSignInPermissions();
         if (!mounted) return;
-        if (user.onboardingCompleted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-            (_) => false,
-          );
-        } else {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const OnboardingScreen()),
-            (_) => false,
-          );
-        }
+        await AuthNavigation.routeAfterAuth(context, user);
       },
       onError: (msg) {
         if (!mounted) return;
@@ -94,7 +105,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(msg)));
-        print(msg);
+        appLog(msg);
       },
     );
     if (mounted) setState(() => _googleLoading = false);
@@ -106,19 +117,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     await AuthService.instance.socialSignIn(
       provider: 'apple',
       onSuccess: (user) async {
-        await PermissionsService.instance.requestPostSignInPermissions();
         if (!mounted) return;
-        if (user.onboardingCompleted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-            (_) => false,
-          );
-        } else {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const OnboardingScreen()),
-            (_) => false,
-          );
-        }
+        await AuthNavigation.routeAfterAuth(context, user);
       },
       onError: (msg) {
         if (!mounted) return;
@@ -140,116 +140,204 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           opacity: _fadeIn,
           child: SlideTransition(
             position: _slideUp,
-            child: Padding(
-              padding: AppTheme.screenPadding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  const Spacer(flex: 2),
-
-                  const AppLogo(height: 56),
-                  const SizedBox(height: 28),
-
-                  // Headline
-                  Text(
-                    'Scheduled safety calls.\nReal guardian alerts.',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      height: 1.15,
-                      color: isDark ? Colors.white : Colors.black87,
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                return SingleChildScrollView(
+                  padding: AppTheme.screenPadding,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Set your check-in time. If we do not hear "I am fine," SafeBangle retries your call and alerts your next of kin with your last location.',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDark ? Colors.white60 : Colors.black54,
-                      height: 1.4,
-                    ),
-                  ),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          const Spacer(flex: 2),
 
-                  const Spacer(flex: 3),
+                          const AppLogo(height: 72),
+                          const SizedBox(height: 28),
 
-                  // Email sign-in (primary)
-                  CustomButton(
-                    label: 'Continue with Email',
-                    onPressed: _onContinueWithEmail,
-                    loading: _isLoading,
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Divider
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Divider(
-                          color: isDark ? Colors.white24 : Colors.grey.shade300,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'or',
-                          style: TextStyle(
-                            color: isDark
-                                ? Colors.white38
-                                : Colors.grey.shade500,
-                            fontSize: 14,
+                          // Headline
+                          Text(
+                            'Scheduled safety calls.\nReal guardian alerts.',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              height: 1.15,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Set your check-in time. If we do not hear "I am fine," SafeCheck retries your call and alerts your next of kin with your last location.',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: isDark ? Colors.white60 : Colors.black54,
+                              height: 1.4,
+                            ),
+                          ),
+
+                          const Spacer(flex: 3),
+
+                          // Email sign-in (primary)
+                          CustomButton(
+                            label: 'Continue with Email',
+                            onPressed: _onContinueWithEmail,
+                            loading: _isLoading,
+                          ),
+                          if (AppConfig.enableSocialSignIn) ...<Widget>[
+                            const SizedBox(height: 14),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Divider(
+                                    color: isDark
+                                        ? Colors.white24
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    'or',
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white38
+                                          : Colors.grey.shade500,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color: isDark
+                                        ? Colors.white24
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            if (AppConfig.enableGoogleSignIn) ...<Widget>[
+                              SocialSignInButton(
+                                label: 'Continue with Google',
+                                loading: _googleLoading,
+                                icon: const Icon(
+                                  Icons.g_mobiledata,
+                                  size: 28,
+                                  color: Colors.red,
+                                ),
+                                onPressed: _onGoogleSignIn,
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            if (AppConfig.enableAppleSignIn)
+                              SocialSignInButton(
+                                label: 'Continue with Apple',
+                                loading: _appleLoading,
+                                icon: Icon(
+                                  Icons.apple,
+                                  size: 24,
+                                  color: isDark ? Colors.white : Colors.black,
+                                ),
+                                onPressed: _onAppleSignIn,
+                              ),
+                          ],
+
+                          const SizedBox(height: 16),
+
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: <Widget>[
+                                Text(
+                                  'Don\'t have an account? ',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark
+                                        ? Colors.white38
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _onCreateAccount,
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Create account'),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: <Widget>[
+                                Text(
+                                  'By continuing you agree to our ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? Colors.white30
+                                        : Colors.grey.shade500,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => _openUrl(AppConfig.termsUrl),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Terms',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                                Text(
+                                  ' & ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? Colors.white30
+                                        : Colors.grey.shade500,
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      _openUrl(AppConfig.privacyUrl),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Privacy Policy',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                       ),
-                      Expanded(
-                        child: Divider(
-                          color: isDark ? Colors.white24 : Colors.grey.shade300,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Google sign-in
-                  SocialSignInButton(
-                    label: 'Continue with Google',
-                    loading: _googleLoading,
-                    icon: const Icon(
-                      Icons.g_mobiledata,
-                      size: 28,
-                      color: Colors.red,
-                    ),
-                    onPressed: _onGoogleSignIn,
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Apple sign-in
-                  SocialSignInButton(
-                    label: 'Continue with Apple',
-                    loading: _appleLoading,
-                    icon: Icon(
-                      Icons.apple,
-                      size: 24,
-                      color: isDark ? Colors.white : Colors.black,
-                    ),
-                    onPressed: _onAppleSignIn,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Terms text
-                  Center(
-                    child: Text(
-                      'By continuing you agree to our Terms & Privacy Policy',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.white30 : Colors.grey.shade500,
-                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ),

@@ -9,6 +9,8 @@ import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:safecheck/services/auth_service.dart';
 import 'package:safecheck/services/safety_service.dart';
+import 'package:safecheck/utils/app_log.dart';
+import 'package:safecheck/widgets/app_logo.dart';
 
 class SimulatedCallContext {
   const SimulatedCallContext({
@@ -150,14 +152,14 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
         }
       });
       _tts.setErrorHandler((errorMessage) {
-        debugPrint('[SimulatedCallScreen][TTS] Runtime error: $errorMessage');
+        appLog('[SimulatedCallScreen][TTS] Runtime error: $errorMessage');
         if (!mounted) return;
         setState(() => _ttsSpeaking = false);
       });
       _ttsReady = true;
     } catch (e, st) {
-      debugPrint('[SimulatedCallScreen][TTS] Init failed: $e');
-      debugPrint('[SimulatedCallScreen][TTS] Init stack: $st');
+      appLog('[SimulatedCallScreen][TTS] Init failed: $e');
+      appLog('[SimulatedCallScreen][TTS] Init stack: $st');
       _ttsReady = false;
       if (e is MissingPluginException) {
         _ttsPluginAvailable = false;
@@ -285,8 +287,8 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
       await _tts.speak(text);
       return true;
     } catch (e, st) {
-      debugPrint('[SimulatedCallScreen][TTS] Speak failed: $e');
-      debugPrint('[SimulatedCallScreen][TTS] Speak stack: $st');
+      appLog('[SimulatedCallScreen][TTS] Speak failed: $e');
+      appLog('[SimulatedCallScreen][TTS] Speak stack: $st');
       if (e is MissingPluginException) {
         _ttsPluginAvailable = false;
       }
@@ -629,13 +631,17 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
                               ),
                             ],
                           ),
-                          child: const CircleAvatar(
-                            radius: 65,
-                            backgroundColor: Color(0xFF1E2A44),
-                            child: Icon(
-                              Icons.shield,
-                              size: 72,
-                              color: Colors.white,
+                          child: ClipOval(
+                            child: ColoredBox(
+                              color: const Color(0xFF1E2A44),
+                              child: Padding(
+                                padding: EdgeInsets.all(avatarSize * 0.14),
+                                child: Image.asset(
+                                  AppLogo.darkAssetPath,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                ),
+                              ),
                             ),
                           ),
                         ),

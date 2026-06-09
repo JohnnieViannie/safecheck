@@ -43,11 +43,87 @@ def _database_from_url(database_url: str):
     }
 
 
+def _split_csv_env(key: str, default: str = '') -> list[str]:
+    raw = os.getenv(key, default).strip()
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(',') if item.strip()]
+
+
+# Production hostnames for SafeBangle only.
+SAFEBANGLE_ALLOWED_HOSTS = (
+    'safebangle.com',
+    'www.safebangle.com',
+    'api.safebangle.com',
+)
+SAFEBANGLE_TRUSTED_ORIGINS = (
+    'https://safebangle.com',
+    'https://www.safebangle.com',
+    'https://api.safebangle.com',
+)
+LOCAL_DEV_HOSTS = ('localhost', '127.0.0.1')
+LOCAL_DEV_ORIGINS = (
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+)
+
+
 _load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-replace-this-with-secure-key')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-ifgfg_4747g@g645468n7ud')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes', 'on')
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('DJANGO_ALLOWED_HOSTS', '*').split(',') if h.strip()]
+SAFECHECK_ALLOW_MOCK_AUTH = os.getenv('SAFECHECK_ALLOW_MOCK_AUTH', 'false').lower() in (
+    '1', 'true', 'yes', 'on',
+)
+
+_configured_hosts = _split_csv_env('DJANGO_ALLOWED_HOSTS')
+if _configured_hosts:
+    ALLOWED_HOSTS = _configured_hosts
+else:
+    ALLOWED_HOSTS = list(SAFEBANGLE_ALLOWED_HOSTS)
+    if DEBUG:
+        ALLOWED_HOSTS.extend(LOCAL_DEV_HOSTS)
+
+if '*' in ALLOWED_HOSTS:
+    raise RuntimeError(
+        'DJANGO_ALLOWED_HOSTS cannot include "*". Use safebangle.com hostnames only.'
+    )
+
+for host in ALLOWED_HOSTS:
+    if host in LOCAL_DEV_HOSTS:
+        if not DEBUG:
+            raise RuntimeError(
+                f'Local host "{host}" is not allowed when DJANGO_DEBUG=False.'
+            )
+        continue
+    if not (host == 'safebangle.com' or host.endswith('.safebangle.com')):
+        raise RuntimeError(
+            f'Host "{host}" is not allowed. Only safebangle.com domains are permitted.'
+        )
+
+_configured_origins = _split_csv_env('DJANGO_CSRF_TRUSTED_ORIGINS')
+if _configured_origins:
+    CSRF_TRUSTED_ORIGINS = _configured_origins
+else:
+    CSRF_TRUSTED_ORIGINS = list(SAFEBANGLE_TRUSTED_ORIGINS)
+    if DEBUG:
+        CSRF_TRUSTED_ORIGINS.extend(LOCAL_DEV_ORIGINS)
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'safecheck-verification',
+    }
+}
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.getenv('DJANGO_SECURE_SSL_REDIRECT', 'true').lower() in (
+        '1', 'true', 'yes', 'on',
+    )
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.getenv('DJANGO_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 INSTALLED_APPS = [
     'django.contrib.admin',

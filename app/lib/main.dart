@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'dart:async';
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
-import 'package:safecheck/screens/home_screen.dart';
-import 'package:safecheck/screens/welcome_screen.dart';
 import 'package:safecheck/screens/simulated_call_screen.dart';
+import 'package:safecheck/screens/splash_screen.dart';
 import 'package:safecheck/services/api_service.dart';
 import 'package:safecheck/services/auth_service.dart';
 import 'package:safecheck/services/endpoints.dart';
-import 'package:safecheck/services/alarm_scheduler.dart';
-import 'package:safecheck/services/notification_service.dart';
-import 'package:safecheck/services/push_checkin_service.dart';
 import 'package:safecheck/services/safety_service.dart';
-import 'package:safecheck/services/storage_service.dart';
 import 'package:safecheck/theme.dart';
 
 void main() async {
@@ -53,43 +45,8 @@ void main() async {
     );
   }
 
-  // Required for reliably firing exact alarms on newer Android versions.
-  if (Platform.isAndroid) {
-    await Permission.scheduleExactAlarm.request();
-    await Permission.ignoreBatteryOptimizations.request();
-  }
-
-  await AndroidAlarmManager.initialize();
-
-  final String apiBaseUrl =
-      await StorageService.instance.getApiBaseUrl() ?? Endpoints.baseUrl;
-  ApiService.instance.init(url: apiBaseUrl);
+  ApiService.instance.init(url: Endpoints.baseUrl);
   await AuthService.instance.loadSavedSession();
-
-  await NotificationService.instance.initialize();
-
-  // Server push + local alarms as soon as session exists.
-  await PushCheckinService.instance.initialize();
-  if (AuthService.instance.isLoggedIn) {
-    await AlarmScheduler.instance.ensureAlarmsScheduled();
-    await PushCheckinService.instance.registerTokenIfLoggedIn();
-  }
-
-  // CallKit permissions (Android full-screen + notification).
-  if (Platform.isAndroid) {
-    await FlutterCallkitIncoming.requestNotificationPermission(<String, dynamic>{
-      'title': 'SafeCheck Call Alerts',
-      'rationaleMessagePermission':
-          'SafeCheck needs permission to show incoming call screens.',
-      'postNotificationMessageRequired':
-          'SafeCheck needs notification permission to show call alerts.',
-    });
-
-    final bool? canFullScreen = await FlutterCallkitIncoming.canUseFullScreenIntent();
-    if (canFullScreen == true) {
-      await FlutterCallkitIncoming.requestFullIntentPermission();
-    }
-  }
 
   // Handle CallKit actions even when the app UI is not currently visible.
   final Set<String> handledCallKitIds = <String>{};
@@ -249,33 +206,12 @@ class SafeCheckApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'SafeBangle',
+      title: 'SafeCheck',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
       navigatorKey: navigatorKey,
-      home: const AuthGate(),
-    );
-  }
-}
-
-class AuthGate extends StatelessWidget {
-  const AuthGate({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<bool>(
-      stream: AuthService.instance.authStateChanges,
-      // Use the synchronous getter as initialData so we never get stuck
-      // on ConnectionState.waiting when the event was already emitted
-      // before this StreamBuilder subscribed (broadcast stream race condition).
-      initialData: AuthService.instance.isLoggedIn,
-      builder: (context, snapshot) {
-        if (snapshot.data == true) {
-          return const HomeScreen();
-        }
-        return const WelcomeScreen();
-      },
+      home: const SplashScreen(),
     );
   }
 }

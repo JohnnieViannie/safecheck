@@ -44,6 +44,7 @@ class PushProvider:
         call_kit_id: str,
         scheduled_for_iso: str,
         frequency: str,
+        checkin_time: str = '18:00',
         snoozed: bool = False,
     ) -> Dict[str, Any]:
         if not fcm_token:
@@ -55,6 +56,7 @@ class PushProvider:
             'callKitId': call_kit_id,
             'scheduledFor': scheduled_for_iso,
             'frequency': frequency,
+            'checkinTime': checkin_time,
             'snoozed': 'true' if snoozed else 'false',
             'alarmId': '1' if snoozed else '0',
         }

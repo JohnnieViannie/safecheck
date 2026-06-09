@@ -38,20 +38,54 @@ class NotificationService {
     tzdata.initializeTimeZones();
   }
 
+  static const String alarmRingChannelId = 'safecheck_alarm_ring_channel';
+
+  static Future<void> _ensureAlarmRingChannel(
+    FlutterLocalNotificationsPlugin plugin,
+  ) async {
+    final AndroidFlutterLocalNotificationsPlugin? android = plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      alarmRingChannelId,
+      'SafeCheck Alarm Ring',
+      description: 'Loud check-in alarms that wake the phone',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+    await android.createNotificationChannel(channel);
+  }
+
   /// Fallback when CallKit cannot start from the AlarmManager background isolate.
   @pragma('vm:entry-point')
   static Future<void> showBackgroundIncomingCallFallback() async {
     await ensureBackgroundAlarmIsolateReady();
+    final FlutterLocalNotificationsPlugin plugin =
+        FlutterLocalNotificationsPlugin();
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin.initialize(
+      const InitializationSettings(android: androidSettings),
+    );
+    await _ensureAlarmRingChannel(plugin);
+
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'safecheck_alarm_channel',
-      'SafeCheck Alarms',
-      channelDescription: 'Full-screen check-in alarms',
+      alarmRingChannelId,
+      'SafeCheck Alarm Ring',
+      channelDescription: 'Loud check-in alarms that wake the phone',
       importance: Importance.max,
       priority: Priority.max,
       category: AndroidNotificationCategory.alarm,
       fullScreenIntent: true,
+      ongoing: true,
+      autoCancel: false,
       playSound: true,
       enableVibration: true,
+      visibility: NotificationVisibility.public,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
     );
     const NotificationDetails details = NotificationDetails(
       android: androidDetails,
@@ -60,13 +94,6 @@ class NotificationService {
         presentAlert: true,
         presentSound: true,
       ),
-    );
-    final FlutterLocalNotificationsPlugin plugin =
-        FlutterLocalNotificationsPlugin();
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    await plugin.initialize(
-      const InitializationSettings(android: androidSettings),
     );
     await plugin.show(
       1999,

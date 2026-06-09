@@ -15,6 +15,13 @@ class ProviderConfig:
         return os.getenv('AT_SMS_BASE_URL', 'https://api.africastalking.com/version1/messaging')
 
     @staticmethod
+    def sms_bulk_url() -> str:
+        return os.getenv(
+            'AT_SMS_BULK_URL',
+            'https://api.africastalking.com/version1/messaging/bulk',
+        )
+
+    @staticmethod
     def username() -> str:
         return os.getenv('AT_USERNAME', '')
 
@@ -24,7 +31,8 @@ class ProviderConfig:
 
     @staticmethod
     def from_number() -> str:
-        return os.getenv('AT_SENDER_ID', 'SafeCheck')
+        # Leave unset unless Africa's Talking has approved your alphanumeric sender ID.
+        return os.getenv('AT_SENDER_ID', '').strip()
 
     @staticmethod
     def callback_base_url() -> str:

@@ -4,13 +4,14 @@ import 'package:flutter/services.dart';
 import 'package:safecheck/screens/simulated_call_screen.dart';
 import 'package:safecheck/screens/settings_screen.dart';
 import 'package:safecheck/theme.dart';
+import 'package:safecheck/widgets/app_logo.dart';
 import 'package:safecheck/screens/welcome_screen.dart';
 import 'package:safecheck/services/auth_service.dart';
 import 'package:safecheck/services/alarm_scheduler.dart';
+import 'package:safecheck/services/alarm_watchdog.dart';
 import 'package:safecheck/services/reliable_alarm_permissions.dart';
 import 'package:safecheck/services/safety_service.dart';
 import 'package:safecheck/services/storage_service.dart';
-import 'package:safecheck/widgets/app_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -57,10 +58,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _nextCallAt = _computeDueCallAt(now);
     }
 
+    await _advanceIfAlreadySafeForCurrentSlot(now);
+
     // Ensure background alarms are scheduled (even if the UI timer is paused).
     unawaited(AlarmScheduler.instance.ensureAlarmsScheduled());
+    AlarmWatchdog.instance.attach();
     if (mounted) {
       unawaited(ReliableAlarmPermissions.ensureAndroidAlarmReliability(context: context));
+      if (await _shouldAutoLaunchCall()) {
+        unawaited(_autoLaunchCallIfDue());
+      }
     }
     if (snoozed != null && snoozed.isAfter(now)) {
       unawaited(AlarmScheduler.instance.scheduleSnoozeAlarm(snoozed));
@@ -90,6 +97,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         if ((profile.checkinFrequency ?? '').trim().isNotEmpty) {
           _frequency = profile.checkinFrequency!.trim();
         }
+        if (mounted) {
+          setState(() {});
+        }
       }
     }
   }
@@ -99,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await StorageService.instance.saveLastCheckIn(now);
     final String? uid = AuthService.instance.currentUser?.uid;
     if (uid != null && uid.isNotEmpty) {
+      await SafetyService.instance.confirmSafe(uid: uid);
       await SafetyService.instance.createCheckin(
         uid: uid,
         status: 'safe_confirmed',
@@ -117,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     await StorageService.instance.clearSnoozedUntil();
     unawaited(AlarmScheduler.instance.cancelSnoozeAlarm());
+    unawaited(AlarmScheduler.instance.cancelRetryAlarms());
 
     if (!mounted) return;
 
@@ -140,8 +152,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Skip ringing if the user already confirmed safe for this scheduled slot.
+  Future<void> _advanceIfAlreadySafeForCurrentSlot(DateTime now) async {
+    final DateTime? lastSafe = await StorageService.instance.getLastCheckIn();
+    if (lastSafe == null) {
+      return;
+    }
+    if (!lastSafe.isBefore(_nextCallAt)) {
+      _nextCallAt = _computeNextCallAt(now);
+    }
+  }
+
+  Future<bool> _shouldAutoLaunchCall() async {
+    final DateTime now = DateTime.now();
+    if (_nextCallAt.isAfter(now)) {
+      return false;
+    }
+
+    final DateTime? lastSafe = await StorageService.instance.getLastCheckIn();
+    if (lastSafe != null && !lastSafe.isBefore(_nextCallAt)) {
+      return false;
+    }
+
+    if (now.difference(_nextCallAt) > _gracePeriod) {
+      return false;
+    }
+
+    return true;
+  }
+
   Future<void> _autoLaunchCallIfDue() async {
     if (_callLaunchInProgress || !mounted) {
+      return;
+    }
+    if (!await _shouldAutoLaunchCall()) {
       return;
     }
     _callLaunchInProgress = true;
@@ -161,10 +205,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _updateRemaining();
-      if (_nextCallAt.isBefore(DateTime.now())) {
-        // Call UI is driven by CallKit; avoid auto-navigating here to
-        // prevent duplicate screens.
-      }
+      unawaited(AlarmWatchdog.instance.refresh());
+      unawaited(_autoLaunchCallIfDue());
     }
   }
 
@@ -256,6 +298,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           );
           final String? uid = AuthService.instance.currentUser?.uid;
           if (uid != null && uid.isNotEmpty) {
+            await SafetyService.instance.syncSnooze(
+              uid: uid,
+              snoozedUntil: result.snoozedUntil!,
+            );
             await SafetyService.instance.logTimelineEvent(
               uid: uid,
               eventType: 'checkin_snoozed',
@@ -358,6 +404,70 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return '$hh:$mm:$ss';
   }
 
+  bool get _isCallDue => _remaining <= Duration.zero;
+
+  String get _greeting {
+    final int hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning';
+    }
+    if (hour < 17) {
+      return 'Good afternoon';
+    }
+    return 'Good evening';
+  }
+
+  String get _firstName {
+    final String? fullName =
+        AuthService.instance.currentUser?.fullName?.trim();
+    if (fullName != null && fullName.isNotEmpty) {
+      return fullName.split(RegExp(r'\s+')).first;
+    }
+    return 'there';
+  }
+
+  double _countdownProgress() {
+    final int totalSeconds = _frequency == 'Weekly'
+        ? const Duration(days: 7).inSeconds
+        : const Duration(days: 1).inSeconds;
+    if (totalSeconds <= 0) {
+      return 0;
+    }
+    final double remainingFraction =
+        (_remaining.inSeconds / totalSeconds).clamp(0.0, 1.0);
+    return 1.0 - remainingFraction;
+  }
+
+  Color _statusAccent() {
+    if (_isCallDue) {
+      return const Color(0xFFFFB74D);
+    }
+    if (_callStatus.toLowerCase().contains('safe')) {
+      return const Color(0xFF4ADE80);
+    }
+    if (_callStatus.toLowerCase().contains('missed') ||
+        _callStatus.toLowerCase().contains('alert')) {
+      return AppTheme.secondary;
+    }
+    return AppTheme.primary;
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+    );
+    await _reloadSchedule();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _nextCallAt = _computeDueCallAt(DateTime.now());
+      _remaining = _nextCallAt.difference(DateTime.now());
+      _callStatus = 'Scheduled';
+    });
+    unawaited(AlarmScheduler.instance.ensureAlarmsScheduled());
+  }
+
   Future<void> _logout() async {
     unawaited(AlarmScheduler.instance.cancelAllAlarms());
     await AuthService.instance.signOut();
@@ -378,309 +488,503 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final int totalSeconds = _frequency == 'Weekly'
-        ? const Duration(days: 7).inSeconds
-        : const Duration(days: 1).inSeconds;
-    final double progress = totalSeconds > 0
-        ? (_remaining.inSeconds / totalSeconds).clamp(0.0, 1.0)
-        : 0;
+    final double progress = _countdownProgress();
+    final Color accent = _statusAccent();
+    final String? kinName =
+        AuthService.instance.currentUser?.emergencyContactName;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
-        systemNavigationBarColor: const Color(
-          0xFF0A0A0A,
-        ), // Also make the bottom nav bar dark!
         statusBarColor: Colors.transparent,
+        systemNavigationBarColor: const Color(0xFF0A0F14),
       ),
       child: Theme(
         data: AppTheme.darkTheme,
         child: Scaffold(
-          backgroundColor: const Color(0xFF0A0A0A), // Deep dark modern base
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            iconTheme: const IconThemeData(color: Colors.white),
-            title: const AppLogo(height: 32),
-            actions: [
-              PopupMenuButton<String>(
-                icon: const Icon(
-                  Icons.more_vert,
-                  size: 26,
-                  color: Colors.white,
-                ),
-                tooltip: 'Menu',
-                color: const Color(0xFF1F1F1F), // Dark background for the popup
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: Colors.white.withOpacity(0.1)),
-                ),
-                onSelected: (value) {
-                  if (value == 'logout') {
-                    _logout();
-                  } else if (value == 'settings') {
-                    Navigator.of(context)
-                        .push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => const SettingsScreen(),
-                          ),
-                        )
-                        .then((_) async {
-                          await _reloadSchedule();
-                          if (!mounted) return;
-                          setState(() {
-                            _nextCallAt = _computeDueCallAt(DateTime.now());
-                            _remaining = _nextCallAt.difference(DateTime.now());
-                            _callStatus = 'Scheduled';
-                          });
-                          unawaited(
-                            AlarmScheduler.instance.ensureAlarmsScheduled(),
-                          );
-                        });
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'settings',
-                    child: ListTile(
-                      leading: Icon(Icons.settings, color: Colors.white),
-                      title: Text(
-                        'Settings',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: ListTile(
-                      leading: Icon(Icons.logout, color: Colors.redAccent),
-                      title: Text(
-                        'Logout',
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
+          backgroundColor: const Color(0xFF0A0F14),
           body: SafeArea(
-            child: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: <Widget>[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                      children: <Widget>[
+                        _buildTopBar(),
                         const SizedBox(height: 20),
-
-                        // Status header with safety dot
-                        Row(
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF4ADE80),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text(
-                              'You are protected',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 8),
-                        Text(
-                          'Next scheduled call in',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.7),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-
-                        const SizedBox(height: 40),
-
-                        // Glassmorphic Countdown Card
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.12),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.4),
-                                blurRadius: 30,
-                                offset: const Offset(0, 15),
-                              ),
-                              BoxShadow(
-                                color: Colors.white.withOpacity(0.08),
-                                blurRadius: 20,
-                                offset: const Offset(-8, -8),
-                              ),
-                            ],
-                          ),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Circular progress ring
-                              SizedBox(
-                                width: 210,
-                                height: 210,
-                                child: CircularProgressIndicator(
-                                  value: progress,
-                                  strokeWidth: 13,
-                                  backgroundColor: Colors.white.withOpacity(
-                                    0.08,
-                                  ),
-                                  valueColor:
-                                      const AlwaysStoppedAnimation<Color>(
-                                        Color(0xFF4ADE80),
-                                      ),
-                                ),
-                              ),
-
-                              // Countdown Text (reduced size)
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _formatDuration(_remaining),
-                                    style: const TextStyle(
-                                      fontSize: 40, // ← Reduced from 56
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.0,
-                                      color: Colors.white,
-                                      letterSpacing: -1.5,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 10),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-
+                        _buildWelcomeCard(accent),
                         const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton(
-                            onPressed: _simulateCallNow,
-                            child: const Text('Simulate Call Now'),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.04),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              const Text(
-                                'Call status',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _callStatus,
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Frequency: $_frequency • Time: ${_displayTime(_checkinTime)}',
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
+                        _buildCountdownCard(progress, accent),
                         const SizedBox(height: 20),
-
-                        // Modern "I'm Safe" Button
-                        GestureDetector(
-                          onTap: _markSafe,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 22),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1F1F1F),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: const Color(0xFF4ADE80).withOpacity(0.3),
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                const BoxShadow(
-                                  color: Colors.black,
-                                  blurRadius: 10,
-                                  offset: Offset(4, 4),
-                                ),
-                                BoxShadow(
-                                  color: Colors.white.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(-4, -4),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Text(
-                                "I'M SAFE",
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF4ADE80),
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
+                        _buildScheduleRow(),
+                        const SizedBox(height: 24),
+                        _buildSafeButton(),
+                        const SizedBox(height: 12),
+                        _buildTestCallButton(),
+                        const SizedBox(height: 20),
+                        _buildStatusCard(kinName, accent),
+                        const SizedBox(height: 28),
                       ],
                     ),
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Row(
+      children: <Widget>[
+        const AppLogo(height: 34),
+        const Spacer(),
+        IconButton(
+          onPressed: _openSettings,
+          tooltip: 'Settings',
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.06),
+            foregroundColor: Colors.white,
+          ),
+          icon: const Icon(Icons.settings_rounded, size: 22),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: _logout,
+          tooltip: 'Log out',
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.06),
+            foregroundColor: Colors.white70,
+          ),
+          icon: const Icon(Icons.logout_rounded, size: 22),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWelcomeCard(Color accent) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: <Color>[
+            AppTheme.primary.withValues(alpha: 0.45),
+            const Color(0xFF152028),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _greeting,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Hey, $_firstName',
+                      style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accent.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        shape: BoxShape.circle,
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.6),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isCallDue ? 'Check-in due' : 'Protected',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _isCallDue
+                ? 'Your safety call is ready. Answer or tap I\'m Safe.'
+                : 'We\'ll call you at ${_displayTime(_checkinTime)} for your check-in.',
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.45,
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCountdownCard(double progress, Color accent) {
+    final List<String> parts = _formatDuration(_remaining).split(':');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141A22),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: accent.withValues(alpha: 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        children: <Widget>[
+          Text(
+            _isCallDue ? 'Check-in window open' : 'Next call in',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.65),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: 220,
+            height: 220,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                SizedBox(
+                  width: 220,
+                  height: 220,
+                  child: CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 10,
+                    strokeCap: StrokeCap.round,
+                    backgroundColor: Colors.white.withValues(alpha: 0.06),
+                    valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        _timeUnit(parts[0], 'hrs'),
+                        _timeColon(),
+                        _timeUnit(parts[1], 'min'),
+                        _timeColon(),
+                        _timeUnit(parts[2], 'sec'),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timeUnit(String value, String label) {
+    return Column(
+      children: <Widget>[
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -1,
+            color: Colors.white,
+            height: 1,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withValues(alpha: 0.45),
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _timeColon() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Text(
+        ':',
+        style: TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w300,
+          color: Colors.white.withValues(alpha: 0.35),
+          height: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleRow() {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: _infoChip(
+            icon: Icons.schedule_rounded,
+            label: 'Call time',
+            value: _displayTime(_checkinTime),
+            color: AppTheme.primary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _infoChip(
+            icon: Icons.repeat_rounded,
+            label: 'Frequency',
+            value: _frequency,
+            color: const Color(0xFF5C9CE6),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141A22),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, size: 20, color: color),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.5),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafeButton() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _markSafe,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: <Color>[Color(0xFF2E9E5A), Color(0xFF4ADE80)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: const Color(0xFF4ADE80).withValues(alpha: 0.25),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(Icons.verified_user_rounded, color: Colors.white, size: 22),
+              SizedBox(width: 10),
+              Text(
+                "I'm Safe",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTestCallButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: _simulateCallNow,
+        icon: Icon(
+          Icons.phone_in_talk_rounded,
+          size: 20,
+          color: Colors.white.withValues(alpha: 0.7),
+        ),
+        label: Text(
+          'Test safety call',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusCard(String? kinName, Color accent) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141A22),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.shield_rounded, size: 18, color: accent),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Status',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            _callStatus,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.4,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
+          ),
+          if (kinName != null && kinName.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 12),
+            Divider(color: Colors.white.withValues(alpha: 0.08), height: 1),
+            const SizedBox(height: 12),
+            Row(
+              children: <Widget>[
+                Icon(
+                  Icons.family_restroom_rounded,
+                  size: 18,
+                  color: Colors.white.withValues(alpha: 0.45),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Emergency contact: $kinName',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

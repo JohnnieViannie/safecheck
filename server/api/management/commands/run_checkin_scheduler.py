@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from api.models import CallAttempt, UserProfile
 from api.services.push_provider import PushProvider, new_call_kit_id
+from api.services.voice_provider import VoiceProvider
 from api.services.schedule_engine import (
     advance_after_dispatch,
     ensure_next_scheduled_checkin,
@@ -82,7 +83,10 @@ class Command(BaseCommand):
             call_kit_id = new_call_kit_id(f'{user.uid}-{user.next_scheduled_checkin_at.isoformat()}')
             scheduled_for = user.next_scheduled_checkin_at
             frequency = user.checkin_frequency or 'Daily'
-            snoozed = False
+            checkin_time = (
+                user.checkin_time.strftime('%H:%M') if user.checkin_time else '18:00'
+            )
+            snoozed = is_snoozed(user, now)
 
             if dry_run:
                 self.stdout.write(
@@ -97,6 +101,7 @@ class Command(BaseCommand):
                 call_kit_id=call_kit_id,
                 scheduled_for_iso=scheduled_for.isoformat(),
                 frequency=frequency,
+                checkin_time=checkin_time,
                 snoozed=snoozed,
             )
 
@@ -145,6 +150,38 @@ class Command(BaseCommand):
                     status='failed',
                     payload={'error': result.get('error', 'unknown')},
                 )
+                if user.phone_number:
+                    voice_result = VoiceProvider().place_checkin_call(
+                        user.phone_number,
+                        user.uid,
+                    )
+                    if voice_result.get('success'):
+                        CallAttempt.objects.create(
+                            user=user,
+                            attempt_number=attempt_number,
+                            provider_call_id=voice_result.get('provider_call_id'),
+                            status='in_progress',
+                            scheduled_for=scheduled_for,
+                        )
+                        user.last_call_status = 'in_progress'
+                        advance_after_dispatch(user, now)
+                        user.save(
+                            update_fields=[
+                                'last_call_status',
+                                'next_scheduled_checkin_at',
+                            ]
+                        )
+                        log_timeline_event(
+                            user=user,
+                            event_type='checkin_pstn_fallback',
+                            source='scheduler',
+                            status='in_progress',
+                            payload={
+                                'provider_call_id': voice_result.get('provider_call_id'),
+                            },
+                        )
+                        triggered += 1
+                        continue
                 skipped += 1
 
         self.stdout.write(

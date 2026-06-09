@@ -1,17 +1,18 @@
 class Endpoints {
   Endpoints._();
 
-  // Set your hosted API base URL here.
-  // E.g. https://api.safecheck.me/v1
-  // You can override with --dart-define=SAFECHECK_API_BASE_URL=https://your-api/api
+  /// Production API root. Override at build time:
+  /// `--dart-define=SAFECHECK_API_BASE_URL=https://api.safebangle.com/api`
   static const String baseUrl = String.fromEnvironment(
     'SAFECHECK_API_BASE_URL',
-    defaultValue: 'http://10.55.185.220:8080/api',
+    defaultValue: 'https://safebangle.com/api',
   );
 
   // Email-based authentication (primary).
   static const String sendEmailCode = '/auth/send-email-code/';
   static const String verifyEmailCode = '/auth/verify-email-code/';
+  static const String forgotPassword = '/auth/forgot-password/';
+  static const String resetPassword = '/auth/reset-password/';
   static const String socialSignIn = '/auth/social-sign-in/';
 
   // Legacy phone-based OTP.
@@ -23,6 +24,9 @@ class Endpoints {
   static const String updateProfile = '/user/profile/';
   static const String updateLocation = '/user/location/';
   static const String registerPushToken = '/devices/register-push/';
+  static const String unregisterPushToken = '/devices/unregister-push/';
+  static const String confirmSafe = '/checkins/confirm-safe/';
+  static const String snoozeCheckin = '/checkins/snooze/';
 
   // Check-ins.
   static const String checkin = '/checkins/';

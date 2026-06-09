@@ -26,6 +26,18 @@ class PhoneNumberService {
     }
   }
 
+  /// Digits-only local number for API POST (server normalizes to E164).
+  static String? toLocalDigitsForApi({
+    required String rawInput,
+    required String isoCode,
+  }) {
+    if (normalizeLocalToE164(rawInput: rawInput, isoCode: isoCode) == null) {
+      return null;
+    }
+    final String digitsOnly = rawInput.trim().replaceAll(RegExp(r'[^0-9]'), '');
+    return digitsOnly.isEmpty ? null : digitsOnly;
+  }
+
   static String toLocalDisplay(String storedValue) {
     final String trimmed = storedValue.trim();
     if (trimmed.startsWith('+')) {

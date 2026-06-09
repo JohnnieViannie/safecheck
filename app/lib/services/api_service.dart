@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:safecheck/config/app_config.dart';
 
 class ApiService {
   ApiService._internal();
@@ -11,8 +12,12 @@ class ApiService {
   String? _bearerToken;
 
   void init({required String url, String? bearerToken}) {
-    baseUrl = url;
-    _bearerToken = bearerToken;
+    if (url.trim().isNotEmpty) {
+      baseUrl = url.trim();
+    }
+    if (bearerToken != null) {
+      _bearerToken = bearerToken;
+    }
   }
 
   void setBaseUrl(String url) => baseUrl = url;
@@ -43,27 +48,37 @@ class ApiService {
 
   Future<http.Response> get(String endpoint, {Map<String, dynamic>? query, Map<String, String>? headers}) {
     final uri = _buildUri(endpoint, query);
-    return http.get(uri, headers: _defaultHeaders(extra: headers));
+    return http
+        .get(uri, headers: _defaultHeaders(extra: headers))
+        .timeout(AppConfig.apiTimeout);
   }
 
   Future<http.Response> post(String endpoint, {dynamic body, Map<String, String>? headers}) {
     final uri = _buildUri(endpoint);
-    return http.post(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body));
+    return http
+        .post(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body))
+        .timeout(AppConfig.apiTimeout);
   }
 
   Future<http.Response> put(String endpoint, {dynamic body, Map<String, String>? headers}) {
     final uri = _buildUri(endpoint);
-    return http.put(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body));
+    return http
+        .put(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body))
+        .timeout(AppConfig.apiTimeout);
   }
 
   Future<http.Response> patch(String endpoint, {dynamic body, Map<String, String>? headers}) {
     final uri = _buildUri(endpoint);
-    return http.patch(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body));
+    return http
+        .patch(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body))
+        .timeout(AppConfig.apiTimeout);
   }
 
   Future<http.Response> delete(String endpoint, {dynamic body, Map<String, String>? headers}) {
     final uri = _buildUri(endpoint);
-    return http.delete(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body));
+    return http
+        .delete(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body))
+        .timeout(AppConfig.apiTimeout);
   }
 
   T decodeJson<T>(http.Response response) {

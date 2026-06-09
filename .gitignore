@@ -1,0 +1,23 @@
+# Secrets and local environment
+server/.env
+**/.env
+**/.env.local
+**/key.properties
+**/*.jks
+**/*.keystore
+**/firebase-service-account.json
+**/client_secret*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

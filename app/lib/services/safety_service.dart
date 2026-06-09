@@ -68,6 +68,28 @@ class SafetyService {
     return response.statusCode == 200 || response.statusCode == 201;
   }
 
+  Future<bool> confirmSafe({required String uid}) async {
+    final response = await ApiService.instance.post(
+      Endpoints.confirmSafe,
+      body: <String, dynamic>{'uid': uid},
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  Future<bool> syncSnooze({
+    required String uid,
+    required DateTime snoozedUntil,
+  }) async {
+    final response = await ApiService.instance.post(
+      Endpoints.snoozeCheckin,
+      body: <String, dynamic>{
+        'uid': uid,
+        'snoozed_until': snoozedUntil.toIso8601String(),
+      },
+    );
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
   Future<bool> logTimelineEvent({
     required String uid,
     required String eventType,

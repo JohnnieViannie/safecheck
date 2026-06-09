@@ -17,8 +17,22 @@ from .serializers import (
     UserTimelineEventSerializer,
     UserProfileSerializer,
 )
-from .services.schedule_engine import ensure_next_scheduled_checkin
+from django.conf import settings
+
+from .services.email_config import EmailConfig
+from .services.email_provider import EmailProvider
+from .services.schedule_engine import (
+    ensure_next_scheduled_checkin,
+    recompute_next_scheduled_checkin,
+)
 from .services.safety_engine import escalate_to_next_of_kin, is_safe_phrase, mark_user_safe
+from .services.sms_provider import SmsProvider
+from .services.verification_store import (
+    create_verification_id,
+    generate_code,
+    store_code,
+    verify_code,
+)
 from .services.voice_provider import VoiceProvider
 
 
@@ -40,9 +54,23 @@ def _log_timeline_event(user, event_type, source='backend', status='info', paylo
 
 
 def _normalize_local_phone_to_e164(raw_value, country_code):
+    """Accept local digits (779697569) or E164 (+256779697569) from mobile clients."""
     text = str(raw_value or '').strip()
-    if not text or text.startswith('+'):
+    if not text:
         return None
+
+    if text.startswith('+'):
+        try:
+            parsed = phonenumbers.parse(text, None)
+        except phonenumbers.NumberParseException:
+            return None
+        if not phonenumbers.is_valid_number(parsed):
+            return None
+        return phonenumbers.format_number(
+            parsed,
+            phonenumbers.PhoneNumberFormat.E164,
+        )
+
     digits = ''.join(ch for ch in text if ch.isdigit())
     if not digits:
         return None
@@ -72,14 +100,8 @@ from django.contrib.auth.hashers import make_password, check_password
 
 @api_view(['POST'])
 def send_email_code(request):
-    """Send a verification code to the given email address.
-
-    In production you would integrate with an email service (SendGrid,
-    Mailgun, SES, etc.) to deliver a real code.  This mock implementation
-    always returns the code ``123456`` straight in the response so the
-    Flutter app can proceed during development.
-    """
-    email = request.data.get('email')
+    """Send a verification code to the given email address."""
+    email = (request.data.get('email') or '').strip().lower()
     password = request.data.get('password')
     if not email:
         return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -93,26 +115,119 @@ def send_email_code(request):
     except UserProfile.DoesNotExist:
         pass
 
-    # Create or retrieve the user profile keyed on email.
-    uid = email  # Use email as uid for simplicity; swap for a real UUID if needed.
-    UserProfile.objects.get_or_create(uid=uid, defaults={'email': email})
+    UserProfile.objects.get_or_create(uid=email, defaults={'email': email})
 
-    verification_id = 'email-' + uuid.uuid4().hex[:12]
-    return Response({
-        'verificationId': verification_id,
-        'message': 'Verification code sent (mock): 123456',
-    })
+    code = generate_code()
+    verification_id = create_verification_id('email')
+    store_code(verification_id, code, email)
+
+    message, error_response = _send_auth_code_email(email, code, purpose='verify')
+    if error_response is not None:
+        return error_response
+
+    return Response({'verificationId': verification_id, 'message': message})
+
+
+def _send_auth_code_email(email: str, code: str, *, purpose: str = 'verify') -> tuple[str, Response | None]:
+    """Send a verification/reset code email. Returns (message, error_response)."""
+    if EmailConfig.is_configured():
+        send_result = EmailProvider().send_verification_code(
+            email,
+            code,
+            purpose=purpose,
+        )
+        if not send_result.get('success'):
+            return '', Response(
+                {'error': send_result.get('error', 'Failed to send email')},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return 'Verification code sent', None
+    if settings.SAFECHECK_ALLOW_MOCK_AUTH:
+        return f'Verification code sent (dev, no SMTP): {code}', None
+    return '', Response(
+        {'error': 'Email delivery is not configured on the server.'},
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
+
+
+@api_view(['POST'])
+def send_password_reset_code(request):
+    """Send a password reset code to an existing email account."""
+    email = (request.data.get('email') or '').strip().lower()
+    if not email:
+        return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = UserProfile.objects.get(uid=email)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {'error': 'No account found with this email'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if not user.password:
+        return Response(
+            {
+                'error': 'This account uses Google sign-in. Log in with Google instead.',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    code = generate_code()
+    verification_id = create_verification_id('reset')
+    store_code(verification_id, code, email)
+
+    message, error_response = _send_auth_code_email(email, code, purpose='reset')
+    if error_response is not None:
+        return error_response
+
+    return Response({'verificationId': verification_id, 'message': message})
+
+
+@api_view(['POST'])
+def reset_password(request):
+    """Verify reset code and set a new password."""
+    verification_id = request.data.get('verificationId')
+    email = (request.data.get('email') or '').strip().lower()
+    code = request.data.get('code')
+    new_password = request.data.get('newPassword') or request.data.get('password')
+
+    if not email:
+        return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
+    if not new_password or len(str(new_password)) < 6:
+        return Response(
+            {'error': 'Password must be at least 6 characters'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not verify_code(verification_id, code, subject=email):
+        return Response({'error': 'Invalid code'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = UserProfile.objects.get(uid=email)
+    except UserProfile.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    user.password = make_password(str(new_password))
+    user.save(update_fields=['password'])
+
+    token = 'token-' + uuid.uuid4().hex[:16]
+    serializer = UserProfileSerializer(user)
+    return Response({'token': token, 'user': serializer.data})
 
 
 @api_view(['POST'])
 def verify_email_code(request):
     """Verify the code the user received via email."""
     verification_id = request.data.get('verificationId')
-    email = request.data.get('email')
+    email = (request.data.get('email') or '').strip().lower()
     password = request.data.get('password')
     code = request.data.get('code')
 
-    if code != '123456' or verification_id is None:
+    if not email:
+        return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not verify_code(verification_id, code, subject=email):
         return Response({'error': 'Invalid code'}, status=status.HTTP_400_BAD_REQUEST)
 
     uid = email
@@ -156,9 +271,16 @@ def social_sign_in(request):
     the email sent by the Flutter client.
     """
     provider = request.data.get('provider', 'unknown')
-    # id_token = request.data.get('idToken')  # TODO: verify in production
+    id_token = (request.data.get('idToken') or '').strip()
     email = (request.data.get('email') or '').strip().lower()
     _display_name = (request.data.get('displayName') or '').strip()
+
+    if not settings.DEBUG and not settings.SAFECHECK_ALLOW_MOCK_AUTH:
+        if not id_token:
+            return Response(
+                {'error': 'idToken is required for social sign-in'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     if not email:
         return Response({'error': 'email is required for social sign-in'}, status=status.HTTP_400_BAD_REQUEST)
@@ -184,9 +306,26 @@ def send_otp(request):
     if not phone_number:
         return Response({'error': 'phoneNumber is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-    verification_id = 'otp-' + phone_number.replace('+', '')
+    code = generate_code()
+    verification_id = create_verification_id('otp')
+    store_code(verification_id, code, phone_number)
     UserProfile.objects.get_or_create(uid=phone_number, defaults={'phone_number': phone_number})
-    return Response({'verificationId': verification_id, 'message': 'OTP sent (mock): 123456'})
+
+    if settings.DEBUG or settings.SAFECHECK_ALLOW_MOCK_AUTH:
+        message = 'OTP sent (dev): 123456'
+    else:
+        sms_result = SmsProvider().send_sms(
+            phone_number,
+            f'Your SafeBangle verification code is {code}. It expires in 10 minutes.',
+        )
+        if not sms_result.get('success'):
+            return Response(
+                {'error': sms_result.get('error', 'Failed to send OTP')},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        message = 'OTP sent'
+
+    return Response({'verificationId': verification_id, 'message': message})
 
 @api_view(['POST'])
 def verify_otp(request):
@@ -194,7 +333,7 @@ def verify_otp(request):
     phone_number = request.data.get('phoneNumber')
     sms_code = request.data.get('smsCode')
 
-    if sms_code != '123456' or verification_id is None:
+    if not verify_code(verification_id, sms_code):
         return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
 
     user, _created = UserProfile.objects.get_or_create(
@@ -243,7 +382,7 @@ def upsert_user_profile(request):
             'emergency_contact_country_code',
             'emergencyContactCountryCode',
         ],
-        'emergency_contact_phone': ['emergency_contact_phone', 'emergencyContactPhone'],
+        # emergency_contact_phone handled below (normalize local or E164)
         'emergency_contact_email': ['emergency_contact_email', 'emergencyContactEmail'],
         'timezone': ['timezone', 'timeZone'],
         'max_retry_attempts': ['max_retry_attempts', 'maxRetryAttempts'],
@@ -304,7 +443,7 @@ def upsert_user_profile(request):
 
     schedule_fields = {'checkin_time', 'timezone', 'checkin_frequency'}
     if schedule_fields.intersection(changed_fields.keys()):
-        ensure_next_scheduled_checkin(user)
+        recompute_next_scheduled_checkin(user)
 
     user.save()
 
@@ -373,6 +512,79 @@ def checkins(request):
     return Response(serializer.data)
 
 @api_view(['POST'])
+def confirm_safe_checkin(request):
+    uid = request.data.get('uid') or request.data.get('user_id')
+    if not uid:
+        return Response({'error': 'uid is required'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        user = UserProfile.objects.get(uid=uid)
+    except UserProfile.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    mark_user_safe(user)
+    _log_timeline_event(
+        user=user,
+        event_type='safe_confirmed',
+        source='app',
+        status='safe_confirmed',
+        payload={'uid': uid},
+    )
+    return Response({'ok': True, 'last_call_status': user.last_call_status})
+
+
+@api_view(['POST'])
+def snooze_checkin(request):
+    uid = request.data.get('uid') or request.data.get('user_id')
+    snoozed_until_raw = request.data.get('snoozed_until') or request.data.get('snoozedUntil')
+    if not uid or not snoozed_until_raw:
+        return Response(
+            {'error': 'uid and snoozed_until are required'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        user = UserProfile.objects.get(uid=uid)
+    except UserProfile.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    dt = parse_datetime(str(snoozed_until_raw)) if isinstance(snoozed_until_raw, str) else None
+    if dt is None:
+        return Response({'error': 'snoozed_until must be ISO datetime'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.snoozed_until = dt
+    user.save(update_fields=['snoozed_until'])
+    _log_timeline_event(
+        user=user,
+        event_type='checkin_snoozed',
+        source='app',
+        status='snoozed',
+        payload={'snoozed_until': dt.isoformat()},
+    )
+    return Response({'ok': True, 'snoozed_until': user.snoozed_until})
+
+
+@api_view(['POST'])
+def unregister_push_token(request):
+    uid = _first_present(request.data, ['uid', 'userId', 'user_id'])
+    if not uid:
+        return Response({'error': 'uid is required'}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        user = UserProfile.objects.get(uid=uid)
+    except UserProfile.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    user.fcm_token = None
+    user.fcm_token_updated_at = timezone.now()
+    user.save(update_fields=['fcm_token', 'fcm_token_updated_at'])
+    _log_timeline_event(
+        user=user,
+        event_type='fcm_token_unregistered',
+        source='app',
+        status='success',
+    )
+    return Response({'ok': True})
+
+
+@api_view(['POST'])
 def create_checkin(request):
     user_uid = request.data.get('user_id')
     status_field = request.data.get('status', 'ok')
@@ -382,13 +594,18 @@ def create_checkin(request):
     except UserProfile.DoesNotExist:
         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    checkin = Checkin.objects.create(user=user, status=status_field)
+    if status_field == 'safe_confirmed':
+        mark_user_safe(user, text='app_checkin')
+        checkin = Checkin.objects.filter(user=user).order_by('-timestamp').first()
+    else:
+        checkin = Checkin.objects.create(user=user, status=status_field)
+
     _log_timeline_event(
         user=user,
         event_type='checkin_recorded',
         source='app',
         status=status_field,
-        payload={'checkin_id': checkin.id},
+        payload={'checkin_id': checkin.id if checkin else None},
     )
     serializer = CheckinSerializer(checkin)
     return Response(serializer.data, status=status.HTTP_201_CREATED)

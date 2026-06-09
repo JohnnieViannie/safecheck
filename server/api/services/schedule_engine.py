@@ -65,14 +65,27 @@ def compute_next_checkin_at(
     return candidate_local.astimezone(dt_timezone.utc)
 
 
-def ensure_next_scheduled_checkin(user: UserProfile, now_utc: Optional[datetime] = None) -> datetime:
-    """Set user.next_scheduled_checkin_at when it has never been computed."""
+def ensure_next_scheduled_checkin(
+    user: UserProfile,
+    now_utc: Optional[datetime] = None,
+    *,
+    force_recompute: bool = False,
+) -> datetime:
+    """Initialize or optionally recompute user.next_scheduled_checkin_at."""
     now_utc = now_utc or timezone.now()
-    if user.next_scheduled_checkin_at:
+    if user.next_scheduled_checkin_at and not force_recompute:
         return user.next_scheduled_checkin_at
     next_at = compute_next_checkin_at(user, now_utc=now_utc)
     user.next_scheduled_checkin_at = next_at
     return next_at
+
+
+def recompute_next_scheduled_checkin(
+    user: UserProfile,
+    now_utc: Optional[datetime] = None,
+) -> datetime:
+    """Recompute the next check-in after schedule settings change."""
+    return ensure_next_scheduled_checkin(user, now_utc, force_recompute=True)
 
 
 def is_snoozed(user: UserProfile, now_utc: Optional[datetime] = None) -> bool:

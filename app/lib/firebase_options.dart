@@ -1,19 +1,23 @@
-// Configure via `flutterfire configure` or pass --dart-define values at build time.
-//
-// Example:
-// flutter run --dart-define=FIREBASE_API_KEY=... --dart-define=FIREBASE_APP_ID=...
-//     --dart-define=FIREBASE_MESSAGING_SENDER_ID=... --dart-define=FIREBASE_PROJECT_ID=...
+// Generated from google-services.json (project safecheck-c4fa6).
+// Override at build time with --dart-define if needed.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 class DefaultFirebaseOptions {
   DefaultFirebaseOptions._();
 
+  static const String _defaultApiKey = 'AIzaSyDRrE8UjiAImAYLnwX1QjMcRaDvKDGbnfA';
+  static const String _defaultAppId =
+      '1:780122444136:android:d0c9d2769084feb5fd46dd';
+  static const String _defaultMessagingSenderId = '780122444136';
+  static const String _defaultProjectId = 'safecheck-c4fa6';
+
   static bool get isConfigured {
-    return const String.fromEnvironment('FIREBASE_API_KEY', defaultValue: '').isNotEmpty &&
-        const String.fromEnvironment('FIREBASE_APP_ID', defaultValue: '').isNotEmpty &&
-        const String.fromEnvironment('FIREBASE_PROJECT_ID', defaultValue: '').isNotEmpty;
+    return currentPlatform.apiKey.isNotEmpty &&
+        currentPlatform.appId.isNotEmpty &&
+        currentPlatform.projectId.isNotEmpty;
   }
 
   static FirebaseOptions get currentPlatform {
@@ -30,18 +34,45 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
-    appId: String.fromEnvironment('FIREBASE_APP_ID'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
-    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
-  );
+  static FirebaseOptions get android => FirebaseOptions(
+        apiKey: const String.fromEnvironment(
+          'FIREBASE_API_KEY',
+          defaultValue: _defaultApiKey,
+        ),
+        appId: const String.fromEnvironment(
+          'FIREBASE_APP_ID',
+          defaultValue: _defaultAppId,
+        ),
+        messagingSenderId: const String.fromEnvironment(
+          'FIREBASE_MESSAGING_SENDER_ID',
+          defaultValue: _defaultMessagingSenderId,
+        ),
+        projectId: const String.fromEnvironment(
+          'FIREBASE_PROJECT_ID',
+          defaultValue: _defaultProjectId,
+        ),
+      );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
-    appId: String.fromEnvironment('FIREBASE_APP_ID'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
-    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
-    iosBundleId: String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID', defaultValue: 'com.safecheck.app'),
-  );
+  static FirebaseOptions get ios => FirebaseOptions(
+        apiKey: const String.fromEnvironment(
+          'FIREBASE_API_KEY',
+          defaultValue: _defaultApiKey,
+        ),
+        appId: const String.fromEnvironment(
+          'FIREBASE_APP_ID',
+          defaultValue: _defaultAppId,
+        ),
+        messagingSenderId: const String.fromEnvironment(
+          'FIREBASE_MESSAGING_SENDER_ID',
+          defaultValue: _defaultMessagingSenderId,
+        ),
+        projectId: const String.fromEnvironment(
+          'FIREBASE_PROJECT_ID',
+          defaultValue: _defaultProjectId,
+        ),
+        iosBundleId: const String.fromEnvironment(
+          'FIREBASE_IOS_BUNDLE_ID',
+          defaultValue: 'com.safecheck.app',
+        ),
+      );
 }

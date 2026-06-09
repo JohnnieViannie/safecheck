@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
@@ -12,6 +14,7 @@ class StorageService {
   static const String _checkinTimeKey = 'checkin_time';
   static const String _checkinFrequencyKey = 'checkin_frequency';
   static const String _snoozedUntilKey = 'snoozed_until_ms';
+  static const String _onboardingDraftKey = 'safecheck_onboarding_draft';
 
   Future<void> saveLastCheckIn(DateTime value) async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -100,5 +103,32 @@ class StorageService {
       return null;
     }
     return value.trim();
+  }
+
+  Future<void> saveOnboardingDraft(Map<String, dynamic> draft) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_onboardingDraftKey, jsonEncode(draft));
+  }
+
+  Future<Map<String, dynamic>?> getOnboardingDraft() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? raw = prefs.getString(_onboardingDraftKey);
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final dynamic decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // ignore corrupt draft
+    }
+    return null;
+  }
+
+  Future<void> clearOnboardingDraft() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_onboardingDraftKey);
   }
 }

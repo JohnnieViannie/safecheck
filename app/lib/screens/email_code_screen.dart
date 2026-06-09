@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:safecheck/screens/home_screen.dart';
-import 'package:safecheck/screens/onboarding_screen.dart';
+import 'package:flutter/services.dart';
 import 'package:safecheck/services/auth_service.dart';
-import 'package:safecheck/services/permissions_service.dart';
 import 'package:safecheck/theme.dart';
+import 'package:safecheck/utils/auth_navigation.dart';
+import 'package:safecheck/widgets/auth_step_indicator.dart';
 import 'package:safecheck/widgets/custom_button.dart';
 
 class EmailCodeScreen extends StatefulWidget {
@@ -12,11 +12,13 @@ class EmailCodeScreen extends StatefulWidget {
     required this.email,
     required this.password,
     required this.verificationId,
+    this.isSignUp = false,
   });
 
   final String email;
   final String password;
   final String verificationId;
+  final bool isSignUp;
 
   @override
   State<EmailCodeScreen> createState() => _EmailCodeScreenState();
@@ -33,6 +35,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
   bool _loading = false;
   String? _error;
   bool _resending = false;
+  late String _verificationId;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -40,6 +43,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
   @override
   void initState() {
     super.initState();
+    _verificationId = widget.verificationId;
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -50,7 +54,6 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
     );
     _fadeController.forward();
 
-    // Auto-focus the first field.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNodes[0].requestFocus();
     });
@@ -62,14 +65,13 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
     if (value.length == 1 && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
-    // Auto-submit when all 6 digits are entered.
     if (_otpValue.length == 6) {
       _verifyCode();
     }
   }
 
-  void _onKeyDown(int index, RawKeyEvent event) {
-    if (event.logicalKey.keyLabel == 'Backspace' &&
+  void _onKeyDown(int index, KeyEvent event) {
+    if (event.logicalKey == LogicalKeyboardKey.backspace &&
         _controllers[index].text.isEmpty &&
         index > 0) {
       _focusNodes[index - 1].requestFocus();
@@ -88,26 +90,15 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
     });
 
     await AuthService.instance.verifyEmailCode(
-      verificationId: widget.verificationId,
+      verificationId: _verificationId,
       email: widget.email,
       password: widget.password,
       code: otp,
       onSuccess: (profile) async {
-        await PermissionsService.instance.requestPostSignInPermissions();
         if (!mounted) {
           return;
         }
-        if (profile.onboardingCompleted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-            (_) => false,
-          );
-        } else {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute<void>(builder: (_) => const OnboardingScreen()),
-            (_) => false,
-          );
-        }
+        await AuthNavigation.routeAfterAuth(context, profile);
       },
       onError: (errorMessage) {
         if (!mounted) {
@@ -130,9 +121,17 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
     await AuthService.instance.sendEmailCode(
       email: widget.email,
       password: widget.password,
-      onCodeSent: (_) {
+      onCodeSent: (String verificationId) {
         if (!mounted) return;
-        setState(() => _resending = false);
+        setState(() {
+          _resending = false;
+          _verificationId = verificationId;
+          _error = null;
+          for (final TextEditingController controller in _controllers) {
+            controller.clear();
+          }
+        });
+        _focusNodes[0].requestFocus();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Verification code resent!'),
@@ -172,7 +171,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Verify Code'),
+        title: Text(widget.isSignUp ? 'Verify email' : 'Verify Code'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: isDark ? Colors.white : Colors.black87,
@@ -185,7 +184,11 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const SizedBox(height: 20),
+                if (widget.isSignUp) ...<Widget>[
+                  const AuthStepIndicator(currentStep: 2, totalSteps: 3),
+                  const SizedBox(height: 20),
+                ] else
+                  const SizedBox(height: 20),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -200,7 +203,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Check your email',
+                  widget.isSignUp ? 'Check your inbox' : 'Check your email',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -215,7 +218,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                       color: isDark ? Colors.white60 : Colors.black54,
                       height: 1.4,
                     ),
-                    children: [
+                    children: <InlineSpan>[
                       const TextSpan(text: 'We sent a 6-digit code to '),
                       TextSpan(
                         text: widget.email,
@@ -228,17 +231,15 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                   ),
                 ),
                 const SizedBox(height: 32),
-
-                // 6-digit code input boxes
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: List.generate(6, (index) {
+                  children: List<Widget>.generate(6, (int index) {
                     return SizedBox(
                       width: 48,
                       height: 56,
-                      child: RawKeyboardListener(
+                      child: KeyboardListener(
                         focusNode: FocusNode(),
-                        onKey: (event) => _onKeyDown(index, event),
+                        onKeyEvent: (KeyEvent event) => _onKeyDown(index, event),
                         child: TextField(
                           controller: _controllers[index],
                           focusNode: _focusNodes[index],
@@ -278,13 +279,13 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                               ),
                             ),
                           ),
-                          onChanged: (value) => _onDigitChanged(index, value),
+                          onChanged: (String value) =>
+                              _onDigitChanged(index, value),
                         ),
                       ),
                     );
                   }),
                 ),
-
                 if (_error != null) ...<Widget>[
                   const SizedBox(height: 16),
                   Container(
@@ -297,7 +298,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
-                      children: [
+                      children: <Widget>[
                         const Icon(
                           Icons.error_outline,
                           color: Colors.red,
@@ -317,10 +318,7 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                     ),
                   ),
                 ],
-
                 const SizedBox(height: 24),
-
-                // Resend button
                 Center(
                   child: TextButton(
                     onPressed: _resending ? null : _resendCode,
@@ -342,7 +340,6 @@ class _EmailCodeScreenState extends State<EmailCodeScreen>
                           ),
                   ),
                 ),
-
                 const Spacer(),
                 CustomButton(
                   label: 'Verify Code',

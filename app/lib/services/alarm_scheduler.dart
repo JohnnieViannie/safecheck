@@ -1,23 +1,20 @@
-import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'dart:io';
+
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:safecheck/services/alarm_ids.dart';
+import 'package:safecheck/services/alarm_schedule_logic.dart';
+import 'package:safecheck/services/checkin_alarm_background.dart';
 import 'package:safecheck/services/notification_service.dart';
 import 'package:safecheck/services/storage_service.dart';
-import 'package:safecheck/services/checkin_alarm_background.dart';
 
-/// Schedules the next SafeCheck check-in alarm using Android's AlarmManager.
-///
-/// The alarm callback posts a full-screen notification that brings the user
-/// into the app's incoming-call UI (see `HomeScreen`).
+/// Schedules check-in alarms using Android AlarmManager (rolling window +
+/// heartbeat + grace retries) or iOS local notifications.
 class AlarmScheduler {
   AlarmScheduler._();
 
   static final AlarmScheduler instance = AlarmScheduler._();
 
-  // Keep these ids in sync with the background callback.
-  static const int regularAlarmId = 0;
-  static const int snoozeAlarmId = 1;
-
-  // iOS local notification ids (must be stable).
   static const int iosRegularNotificationBaseId = 2100;
   static const int iosSnoozeNotificationId = 2101;
 
@@ -36,9 +33,18 @@ class AlarmScheduler {
     return _uuidFromSeed(seed);
   }
 
-  /// Call on app startup and after login so alarms exist even if HomeScreen
-  /// is never opened again.
+  /// Returns false when exact alarms cannot be scheduled (Android 12+).
+  Future<bool> canScheduleExactAlarms() async {
+    if (!Platform.isAndroid) return true;
+    final PermissionStatus status = await Permission.scheduleExactAlarm.status;
+    return status.isGranted;
+  }
+
   Future<void> ensureAlarmsScheduled() async {
+    if (Platform.isAndroid && !await canScheduleExactAlarms()) {
+      return;
+    }
+
     await scheduleNextRegularAlarm();
 
     if (!Platform.isAndroid) return;
@@ -50,39 +56,21 @@ class AlarmScheduler {
   }
 
   Future<void> scheduleNextRegularAlarm() async {
-    final String checkinTime = (await StorageService.instance.getCheckinTime()) ??
-        '18:00';
+    final String checkinTime =
+        (await StorageService.instance.getCheckinTime()) ?? '18:00';
     final String frequency = await StorageService.instance.getCheckinFrequency();
-
     final DateTime now = DateTime.now();
 
     if (Platform.isAndroid) {
-      final DateTime next = _computeNextRegularAt(
+      await _scheduleAndroidAlarms(
         now: now,
         checkinTime: checkinTime,
         frequency: frequency,
-      );
-
-      // Replace any existing regular alarm so schedule changes apply immediately.
-      await AndroidAlarmManager.cancel(regularAlarmId);
-      await AndroidAlarmManager.oneShotAt(
-        next,
-        regularAlarmId,
-        checkinAlarmCallback,
-        exact: true,
-        wakeup: true,
-        alarmClock: true,
-        rescheduleOnReboot: true,
-        allowWhileIdle: true,
       );
       return;
     }
 
     if (Platform.isIOS) {
-      // iOS cannot run background Dart callbacks at an exact time.
-      // Scheduling local notifications ensures the alarm still fires while the
-      // app is closed; when the user taps it, the existing HomeScreen grace
-      // logic will open the incoming-call UI.
       await _scheduleIosRegularNotifications(
         now: now,
         checkinTime: checkinTime,
@@ -91,30 +79,78 @@ class AlarmScheduler {
     }
   }
 
+  Future<void> _scheduleAndroidAlarms({
+    required DateTime now,
+    required String checkinTime,
+    required String frequency,
+  }) async {
+    await _cancelAndroidManagedAlarms(frequency);
+
+    final int horizon = AlarmIds.horizonForFrequency(frequency);
+    final List<DateTime> occurrences = AlarmScheduleLogic.rollingOccurrences(
+      now: now,
+      checkinTime: checkinTime,
+      frequency: frequency,
+      horizon: horizon,
+    );
+
+    for (int i = 0; i < occurrences.length; i++) {
+      await _scheduleOneShot(
+        when: occurrences[i],
+        alarmId: AlarmIds.rollingBase + i,
+      );
+    }
+
+    await _scheduleOneShot(
+      when: now.add(AlarmIds.heartbeatInterval),
+      alarmId: AlarmIds.heartbeat,
+    );
+  }
+
+  Future<void> scheduleRetryAlarms(DateTime firstRingAt) async {
+    if (!Platform.isAndroid) return;
+
+    final Duration grace = await StorageService.instance.getGracePeriod();
+    final List<DateTime> retries = AlarmScheduleLogic.retryTimes(
+      firstRingAt: firstRingAt,
+      gracePeriod: grace,
+      retryInterval: AlarmIds.retryInterval,
+      maxSlots: AlarmIds.retrySlots,
+    );
+
+    for (int i = 0; i < AlarmIds.retrySlots; i++) {
+      await AndroidAlarmManager.cancel(AlarmIds.retryBase + i);
+    }
+
+    for (int i = 0; i < retries.length; i++) {
+      await _scheduleOneShot(
+        when: retries[i],
+        alarmId: AlarmIds.retryBase + i,
+      );
+    }
+  }
+
+  Future<void> cancelRetryAlarms() async {
+    if (!Platform.isAndroid) return;
+    for (int i = 0; i < AlarmIds.retrySlots; i++) {
+      await AndroidAlarmManager.cancel(AlarmIds.retryBase + i);
+    }
+  }
+
   Future<void> scheduleSnoozeAlarm(DateTime snoozedUntil) async {
-    // Ignore obviously invalid times.
     if (!snoozedUntil.isAfter(DateTime.now())) return;
 
     if (Platform.isAndroid) {
-      await AndroidAlarmManager.cancel(snoozeAlarmId);
-      await AndroidAlarmManager.oneShotAt(
-        snoozedUntil,
-        snoozeAlarmId,
-        checkinAlarmCallback,
-        exact: true,
-        wakeup: true,
-        alarmClock: true,
-        rescheduleOnReboot: true,
-        allowWhileIdle: true,
-      );
+      await AndroidAlarmManager.cancel(AlarmIds.snooze);
+      await _scheduleOneShot(when: snoozedUntil, alarmId: AlarmIds.snooze);
       return;
     }
 
     if (Platform.isIOS) {
       final String frequency =
           await StorageService.instance.getCheckinFrequency();
-      final String checkinTime = await StorageService.instance.getCheckinTime() ??
-          '18:00';
+      final String checkinTime =
+          await StorageService.instance.getCheckinTime() ?? '18:00';
       final String callKitId =
           _callKitIdForWhen(snoozedUntil, snoozed: true);
       await NotificationService.instance.scheduleCheckInNotification(
@@ -131,7 +167,7 @@ class AlarmScheduler {
 
   Future<void> cancelSnoozeAlarm() async {
     if (Platform.isAndroid) {
-      await AndroidAlarmManager.cancel(snoozeAlarmId);
+      await AndroidAlarmManager.cancel(AlarmIds.snooze);
     } else if (Platform.isIOS) {
       await NotificationService.instance
           .cancelCheckInNotification(iosSnoozeNotificationId);
@@ -140,10 +176,9 @@ class AlarmScheduler {
 
   Future<void> cancelAllAlarms() async {
     if (Platform.isAndroid) {
-      await AndroidAlarmManager.cancel(regularAlarmId);
-      await AndroidAlarmManager.cancel(snoozeAlarmId);
+      final String frequency = await StorageService.instance.getCheckinFrequency();
+      await _cancelAndroidManagedAlarms(frequency);
     } else if (Platform.isIOS) {
-      // Cancel a small horizon of scheduled regular notifications.
       for (int i = 0; i < 30; i++) {
         await NotificationService.instance
             .cancelCheckInNotification(iosRegularNotificationBaseId + i);
@@ -153,25 +188,28 @@ class AlarmScheduler {
     }
   }
 
-  DateTime _computeNextRegularAt({
-    required DateTime now,
-    required String checkinTime,
-    required String frequency,
-  }) {
-    final List<String> parts = checkinTime.split(':');
-    final int hour = int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 18;
-    final int minute = int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0;
-
-    final Duration period = frequency == 'Weekly'
-        ? const Duration(days: 7)
-        : const Duration(days: 1);
-
-    DateTime candidate = DateTime(now.year, now.month, now.day, hour, minute);
-    if (!candidate.isAfter(now)) {
-      // Move forward to ensure we schedule into the future.
-      candidate = candidate.add(period);
+  Future<void> _cancelAndroidManagedAlarms(String frequency) async {
+    for (final int id in AlarmIds.allManagedIds(frequency)) {
+      await AndroidAlarmManager.cancel(id);
     }
-    return candidate;
+  }
+
+  Future<void> _scheduleOneShot({
+    required DateTime when,
+    required int alarmId,
+  }) async {
+    if (!when.isAfter(DateTime.now())) return;
+
+    await AndroidAlarmManager.oneShotAt(
+      when,
+      alarmId,
+      checkinAlarmCallback,
+      exact: true,
+      wakeup: true,
+      alarmClock: true,
+      rescheduleOnReboot: true,
+      allowWhileIdle: true,
+    );
   }
 
   Future<void> _scheduleIosRegularNotifications({
@@ -179,30 +217,26 @@ class AlarmScheduler {
     required String checkinTime,
     required String frequency,
   }) async {
-    // iOS keeps at most 64 pending notifications; refresh a rolling window.
     final int horizon = frequency == 'Weekly' ? 8 : 30;
 
-    // Cancel the ids we are going to (re)create.
     for (int i = 0; i < horizon; i++) {
       await NotificationService.instance.cancelCheckInNotification(
         iosRegularNotificationBaseId + i,
       );
     }
 
-    DateTime candidate = _computeNextRegularAt(
+    final List<DateTime> occurrences = AlarmScheduleLogic.rollingOccurrences(
       now: now,
       checkinTime: checkinTime,
       frequency: frequency,
+      horizon: horizon,
     );
 
-    // Schedule a few upcoming occurrences so it still triggers even if the
-    // user doesn't open the app for a couple of days.
-    for (int i = 0; i < horizon; i++) {
-      final int notificationId = iosRegularNotificationBaseId + i;
-      final DateTime when = candidate;
+    for (int i = 0; i < occurrences.length; i++) {
+      final DateTime when = occurrences[i];
       final String callKitId = _callKitIdForWhen(when, snoozed: false);
       await NotificationService.instance.scheduleCheckInNotification(
-        notificationId: notificationId,
+        notificationId: iosRegularNotificationBaseId + i,
         when: when,
         snoozed: false,
         callKitId: callKitId,
@@ -210,12 +244,6 @@ class AlarmScheduler {
         frequency: frequency,
         checkinTime: checkinTime,
       );
-
-      final Duration period = frequency == 'Weekly'
-          ? const Duration(days: 7)
-          : const Duration(days: 1);
-      candidate = candidate.add(period);
     }
   }
 }
-

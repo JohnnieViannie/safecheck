@@ -7,6 +7,8 @@ urlpatterns = [
     # Email-based auth (primary).
     path('auth/send-email-code/', views.send_email_code, name='send_email_code'),
     path('auth/verify-email-code/', views.verify_email_code, name='verify_email_code'),
+    path('auth/forgot-password/', views.send_password_reset_code, name='send_password_reset_code'),
+    path('auth/reset-password/', views.reset_password, name='reset_password'),
     path('auth/social-sign-in/', views.social_sign_in, name='social_sign_in'),
 
     # Legacy phone-based OTP.
@@ -18,8 +20,11 @@ urlpatterns = [
     path('user/profile/', views.upsert_user_profile, name='upsert_user_profile'),
     path('user/location/', views.update_location, name='update_location'),
     path('devices/register-push/', views.register_push_token, name='register_push_token'),
+    path('devices/unregister-push/', views.unregister_push_token, name='unregister_push_token'),
     path('checkins/', views.checkins, name='checkins'),
     path('checkins/create/', views.create_checkin, name='create_checkin'),
+    path('checkins/confirm-safe/', views.confirm_safe_checkin, name='confirm_safe_checkin'),
+    path('checkins/snooze/', views.snooze_checkin, name='snooze_checkin'),
     path('checkins/trigger-call/', views.trigger_checkin_call, name='trigger_checkin_call'),
     path('checkins/escalate/', views.escalate_missed_checkin, name='escalate_missed_checkin'),
     path('calls/<str:uid>/attempts/', views.call_attempts, name='call_attempts'),

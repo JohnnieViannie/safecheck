@@ -12,7 +12,12 @@
           "package_name": "com.safecheck.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "780122444136-53f0g0j9mqnivaq8mdboffso50nefo8j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDRrE8UjiAImAYLnwX1QjMcRaDvKDGbnfA"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "780122444136-53f0g0j9mqnivaq8mdboffso50nefo8j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

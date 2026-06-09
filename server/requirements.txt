@@ -1,7 +1,18 @@
-Django>=4.2
+# --- Core framework ---
+Django>=4.2,<6
 djangorestframework>=3.14
-psycopg[binary]>=3.1
-mysqlclient>=2.2
-phonenumbers>=8.13
-requests>=2.31
-firebase-admin>=6.5
+
+# --- Database drivers (use one via DATABASE_URL or DB_ENGINE in .env) ---
+psycopg[binary]>=3.1          # PostgreSQL
+mysqlclient>=2.2              # MySQL / MariaDB
+
+# --- API & integrations ---
+requests>=2.31                # Africa's Talking SMS/voice HTTP calls
+phonenumbers>=8.13            # Phone number parsing & E.164 normalization
+firebase-admin>=6.5           # FCM push for server-driven check-in calls
+
+# --- Timezone data (required by schedule_engine ZoneInfo on Linux/Docker) ---
+tzdata>=2024.1
+
+# --- Production WSGI server (VPS/Linux deploy) ---
+gunicorn>=22.0
