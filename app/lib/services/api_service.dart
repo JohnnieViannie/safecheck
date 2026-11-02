@@ -53,11 +53,16 @@ class ApiService {
         .timeout(AppConfig.apiTimeout);
   }
 
-  Future<http.Response> post(String endpoint, {dynamic body, Map<String, String>? headers}) {
+  Future<http.Response> post(
+    String endpoint, {
+    dynamic body,
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) {
     final uri = _buildUri(endpoint);
     return http
         .post(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body))
-        .timeout(AppConfig.apiTimeout);
+        .timeout(timeout ?? AppConfig.apiTimeout);
   }
 
   Future<http.Response> put(String endpoint, {dynamic body, Map<String, String>? headers}) {
@@ -74,11 +79,39 @@ class ApiService {
         .timeout(AppConfig.apiTimeout);
   }
 
-  Future<http.Response> delete(String endpoint, {dynamic body, Map<String, String>? headers}) {
-    final uri = _buildUri(endpoint);
+  Future<http.Response> delete(
+    String endpoint, {
+    dynamic body,
+    Map<String, dynamic>? query,
+    Map<String, String>? headers,
+  }) {
+    final uri = _buildUri(endpoint, query);
     return http
         .delete(uri, headers: _defaultHeaders(extra: headers), body: body == null ? null : jsonEncode(body))
         .timeout(AppConfig.apiTimeout);
+  }
+
+  Future<http.Response> postMultipart(
+    String endpoint, {
+    required Map<String, String> fields,
+    required http.MultipartFile file,
+    Map<String, String>? headers,
+  }) {
+    final uri = _buildUri(endpoint);
+    final request = http.MultipartRequest('POST', uri);
+    final Map<String, String> mergedHeaders = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (_bearerToken != null && _bearerToken!.isNotEmpty) {
+      mergedHeaders['Authorization'] = 'Bearer $_bearerToken';
+    }
+    if (headers != null) {
+      mergedHeaders.addAll(headers);
+    }
+    request.headers.addAll(mergedHeaders);
+    request.fields.addAll(fields);
+    request.files.add(file);
+    return request.send().then(http.Response.fromStream).timeout(AppConfig.apiTimeout);
   }
 
   T decodeJson<T>(http.Response response) {

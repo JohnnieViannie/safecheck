@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:safecheck/services/auth_service.dart';
-import 'package:safecheck/theme.dart';
 import 'package:safecheck/utils/auth_navigation.dart';
+import 'package:safecheck/widgets/auth_screen_shell.dart';
 import 'package:safecheck/widgets/custom_button.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -70,7 +70,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Reset code resent'),
-            backgroundColor: AppTheme.primary,
+            backgroundColor: AuthScreenColors.accent,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -148,207 +148,150 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('New password'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 12,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+    return AuthScreenScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const AuthHeadline(
+            primary: 'Choose a new\n',
+            accent: 'password.',
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Check your email',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
+          const SizedBox(height: 14),
+          RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: 15,
+                height: 1.5,
+                color: Colors.white.withValues(alpha: 0.62),
               ),
-              const SizedBox(height: 8),
-              RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: isDark ? Colors.white60 : Colors.black54,
-                    height: 1.4,
-                  ),
-                  children: <InlineSpan>[
-                    const TextSpan(text: 'Enter the code sent to '),
-                    TextSpan(
-                      text: widget.email,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    const TextSpan(text: ' and choose a new password.'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List<Widget>.generate(6, (int index) {
-                  return SizedBox(
-                    width: 48,
-                    height: 56,
-                    child: TextField(
-                      controller: _controllers[index],
-                      focusNode: _focusNodes[index],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: 1,
-                      inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        filled: true,
-                        fillColor: isDark
-                            ? Colors.white.withValues(alpha: 0.08)
-                            : Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppTheme.primary,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                      onChanged: (String value) => _onDigitChanged(index, value),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: TextButton(
-                  onPressed: _resending ? null : _resendCode,
-                  child: _resending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.primary,
-                          ),
-                        )
-                      : const Text(
-                          'Didn\'t get it? Resend code',
-                          style: TextStyle(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  labelText: 'New password',
-                  hintText: 'At least 6 characters',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                    ),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
+              children: <InlineSpan>[
+                const TextSpan(text: 'Enter the code sent to '),
+                TextSpan(
+                  text: widget.email,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _confirmController,
-                obscureText: _obscureConfirm,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => _resetPassword(),
-                decoration: InputDecoration(
-                  labelText: 'Confirm password',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureConfirm
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                    ),
-                    onPressed: () {
-                      setState(() => _obscureConfirm = !_obscureConfirm);
-                    },
-                  ),
-                ),
-              ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                const TextSpan(text: ' and choose a new password.'),
               ],
-              const SizedBox(height: 32),
-              CustomButton(
-                label: 'Update password',
-                loading: _loading,
-                onPressed: _resetPassword,
-              ),
-            ],
+            ),
           ),
-        ),
+          const SizedBox(height: 28),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List<Widget>.generate(6, (int index) {
+              return SizedBox(
+                width: 48,
+                height: 56,
+                child: TextField(
+                  controller: _controllers[index],
+                  focusNode: _focusNodes[index],
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  inputFormatters: <TextInputFormatter>[
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  decoration: InputDecoration(
+                    counterText: '',
+                    filled: true,
+                    fillColor: AuthScreenColors.card,
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AuthScreenColors.accent,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  onChanged: (String value) => _onDigitChanged(index, value),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: TextButton(
+              onPressed: _resending ? null : _resendCode,
+              child: _resending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AuthScreenColors.accent,
+                      ),
+                    )
+                  : const Text(
+                      'Didn\'t get it? Resend code',
+                      style: TextStyle(
+                        color: AuthScreenColors.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'New password',
+              hintText: 'At least 6 characters',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.white54,
+                ),
+                onPressed: () {
+                  setState(() => _obscurePassword = !_obscurePassword);
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _confirmController,
+            obscureText: _obscureConfirm,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _resetPassword(),
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Confirm password',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscureConfirm
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  color: Colors.white54,
+                ),
+                onPressed: () {
+                  setState(() => _obscureConfirm = !_obscureConfirm);
+                },
+              ),
+            ),
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: 14),
+            AuthErrorBanner(message: _error!),
+          ],
+          const SizedBox(height: 32),
+          CustomButton(
+            label: 'Update password  →',
+            backgroundColor: AuthScreenColors.accent,
+            loading: _loading,
+            onPressed: _resetPassword,
+          ),
+        ],
       ),
     );
   }

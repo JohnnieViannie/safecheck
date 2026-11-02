@@ -1,11 +1,13 @@
 class Endpoints {
   Endpoints._();
 
-  /// Production API root. Override at build time:
+  /// Production API root (unified Blaces + SafeCheck backend).
+  /// Override at build time:
   /// `--dart-define=SAFECHECK_API_BASE_URL=https://api.safebangle.com/api`
+  /// or local: `--dart-define=SAFECHECK_API_BASE_URL=http://10.0.2.2:8001/api`
   static const String baseUrl = String.fromEnvironment(
     'SAFECHECK_API_BASE_URL',
-    defaultValue: 'https://safebangle.com/api',
+    defaultValue: 'https://server.safebangle.com/api',
   );
 
   // Email-based authentication (primary).
@@ -22,6 +24,8 @@ class Endpoints {
   // User profile.
   static const String userProfile = '/user/profile/';
   static const String updateProfile = '/user/profile/';
+  static const String verifyPin = '/user/profile/verify-pin/';
+  static const String onboardingDraft = '/user/onboarding-draft/';
   static const String updateLocation = '/user/location/';
   static const String registerPushToken = '/devices/register-push/';
   static const String unregisterPushToken = '/devices/unregister-push/';
@@ -33,8 +37,22 @@ class Endpoints {
   static const String createCheckin = '/checkins/create/';
   static const String triggerCall = '/checkins/trigger-call/';
   static const String escalateMissed = '/checkins/escalate/';
+  static const String exportCheckins = '/checkins/export/';
+  static const String sendContactOptIn = '/contacts/send-opt-in/';
+  static const String vaultDocuments = '/vault/documents/';
+  static const String vaultUpload = '/vault/documents/upload/';
+  static String vaultDocument(String docId) => '/vault/documents/$docId/';
+  static String vaultDelete(String docId) => '/vault/documents/$docId/delete/';
+  static String vaultDownload(String docId) => '/vault/documents/$docId/download/';
   static const String callAttempts = '/calls';
   static const String alerts = '/alerts';
   static const String timelineEvents = '/timeline-events/';
   static const String callStatusWebhook = '/webhooks/call-status/';
+
+  static const String journeyActive = '/journeys/active/';
+  static const String journeyStart = '/journeys/start/';
+  static String journeyConfirmArrival(String journeyId) =>
+      '/journeys/$journeyId/confirm-arrival/';
+  static String journeyEnd(String journeyId) => '/journeys/$journeyId/end/';
+  static String journeyPing(String journeyId) => '/journeys/$journeyId/ping/';
 }

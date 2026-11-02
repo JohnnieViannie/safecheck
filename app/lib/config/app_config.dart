@@ -31,6 +31,9 @@ class AppConfig {
   /// HTTP timeout for safety-critical API calls.
   static const Duration apiTimeout = Duration(seconds: 30);
 
+  /// SMTP-backed auth endpoints can be slow on production.
+  static const Duration emailAuthTimeout = Duration(seconds: 60);
+
   /// Set false to hide Google buttons (see GOOGLE_SIGNIN_SETUP.md).
   static const bool enableGoogleSignIn = true;
 

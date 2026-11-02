@@ -1,0 +1,30 @@
+# Apache — SafeBangle Blaces UI (SPA)
+# Vite copies public/.htaccess into dist/ on build.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Keep real files and directories (JS/CSS/assets)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Client-side routes → index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Optional: don’t list directory contents
+Options -Indexes
+
+# Cache hashed assets longer; keep HTML fresh
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+</IfModule>

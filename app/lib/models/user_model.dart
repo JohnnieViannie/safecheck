@@ -8,17 +8,21 @@ class UserModel {
     this.userType,
     this.checkinFrequency,
     this.gracePeriodHours,
+    this.gracePeriodMinutes,
     this.emergencyContactName,
     this.emergencyContactRelationship,
     this.emergencyContactCountryCode,
     this.emergencyContactPhone,
     this.emergencyContactEmail,
-    this.pin,
+    this.emergencyContactsJson,
+    this.notificationPrefsJson,
+    this.pinSet = false,
     this.lastCheckInAt,
     this.checkinTime,
     this.timezone,
     this.lastCallStatus,
     this.escalationStatus,
+    this.snoozedUntil,
   });
 
   final String uid;
@@ -29,20 +33,28 @@ class UserModel {
   final String? userType;
   final String? checkinFrequency;
   final int? gracePeriodHours;
+  final int? gracePeriodMinutes;
   final String? emergencyContactName;
   final String? emergencyContactRelationship;
   final String? emergencyContactCountryCode;
   final String? emergencyContactPhone;
   final String? emergencyContactEmail;
-  final String? pin;
+  final String? emergencyContactsJson;
+  final String? notificationPrefsJson;
+  final bool pinSet;
   final DateTime? lastCheckInAt;
   final String? checkinTime;
   final String? timezone;
   final String? lastCallStatus;
   final String? escalationStatus;
+  final DateTime? snoozedUntil;
 
-  /// The best display identifier: prefers email, falls back to phone, then uid.
-  String get displayIdentifier => email ?? phoneNumber ?? uid;
+  /// The best display identifier: prefers phone, falls back to email, then uid.
+  String get displayIdentifier {
+    if (phoneNumber?.isNotEmpty ?? false) return phoneNumber!;
+    if (email?.isNotEmpty ?? false) return email!;
+    return uid;
+  }
 
   /// First name for greetings — uses [fullName], not email.
   String get firstName {
@@ -63,17 +75,21 @@ class UserModel {
       'userType': userType,
       'checkinFrequency': checkinFrequency,
       'gracePeriodHours': gracePeriodHours,
+      'gracePeriodMinutes': gracePeriodMinutes,
       'emergencyContactName': emergencyContactName,
       'emergencyContactRelationship': emergencyContactRelationship,
       'emergencyContactCountryCode': emergencyContactCountryCode,
       'emergencyContactPhone': emergencyContactPhone,
       'emergencyContactEmail': emergencyContactEmail,
-      'pin': pin,
+      'emergencyContactsJson': emergencyContactsJson,
+      'notificationPrefsJson': notificationPrefsJson,
+      'pinSet': pinSet,
       'lastCheckInAt': lastCheckInAt?.millisecondsSinceEpoch,
       'checkinTime': checkinTime,
       'timezone': timezone,
       'lastCallStatus': lastCallStatus,
       'escalationStatus': escalationStatus,
+      'snoozedUntil': snoozedUntil?.toIso8601String(),
     };
   }
 
@@ -94,6 +110,8 @@ class UserModel {
           map['checkin_frequency'] as String?,
       gracePeriodHours:
           map['gracePeriodHours'] as int? ?? map['grace_period_hours'] as int?,
+      gracePeriodMinutes: map['gracePeriodMinutes'] as int? ??
+          map['grace_period_minutes'] as int?,
       emergencyContactName:
           map['emergencyContactName'] as String? ??
           map['emergency_contact_name'] as String?,
@@ -109,7 +127,15 @@ class UserModel {
       emergencyContactEmail:
           map['emergencyContactEmail'] as String? ??
           map['emergency_contact_email'] as String?,
-      pin: map['pin'] as String?,
+      emergencyContactsJson:
+          map['emergencyContactsJson'] as String? ??
+          map['emergency_contacts_json'] as String?,
+      notificationPrefsJson:
+          map['notificationPrefsJson'] as String? ??
+          map['notification_prefs_json'] as String?,
+      pinSet: map['pinSet'] as bool? ??
+          map['pin_set'] as bool? ??
+          ((map['pin'] as String?)?.trim().isNotEmpty ?? false),
       lastCheckInAt:
           map['lastCheckInAt'] == null && map['last_check_in_at'] == null
           ? null
@@ -125,6 +151,17 @@ class UserModel {
       escalationStatus:
           map['escalationStatus'] as String? ??
           map['escalation_status'] as String?,
+      snoozedUntil: _parseDateTime(map['snoozedUntil'] ?? map['snoozed_until']),
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is int) {
+      return DateTime.fromMillisecondsSinceEpoch(raw);
+    }
+    return DateTime.tryParse(raw.toString());
   }
 }

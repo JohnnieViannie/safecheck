@@ -118,9 +118,9 @@ class AlarmScheduler {
       maxSlots: AlarmIds.retrySlots,
     );
 
-    for (int i = 0; i < AlarmIds.retrySlots; i++) {
-      await AndroidAlarmManager.cancel(AlarmIds.retryBase + i);
-    }
+    await _cancelTrackedAlarms(
+      List<int>.generate(AlarmIds.retrySlots, (int i) => AlarmIds.retryBase + i),
+    );
 
     for (int i = 0; i < retries.length; i++) {
       await _scheduleOneShot(
@@ -132,16 +132,16 @@ class AlarmScheduler {
 
   Future<void> cancelRetryAlarms() async {
     if (!Platform.isAndroid) return;
-    for (int i = 0; i < AlarmIds.retrySlots; i++) {
-      await AndroidAlarmManager.cancel(AlarmIds.retryBase + i);
-    }
+    await _cancelTrackedAlarms(
+      List<int>.generate(AlarmIds.retrySlots, (int i) => AlarmIds.retryBase + i),
+    );
   }
 
   Future<void> scheduleSnoozeAlarm(DateTime snoozedUntil) async {
     if (!snoozedUntil.isAfter(DateTime.now())) return;
 
     if (Platform.isAndroid) {
-      await AndroidAlarmManager.cancel(AlarmIds.snooze);
+      await _cancelTrackedAlarms(<int>[AlarmIds.snooze]);
       await _scheduleOneShot(when: snoozedUntil, alarmId: AlarmIds.snooze);
       return;
     }
@@ -167,7 +167,7 @@ class AlarmScheduler {
 
   Future<void> cancelSnoozeAlarm() async {
     if (Platform.isAndroid) {
-      await AndroidAlarmManager.cancel(AlarmIds.snooze);
+      await _cancelTrackedAlarms(<int>[AlarmIds.snooze]);
     } else if (Platform.isIOS) {
       await NotificationService.instance
           .cancelCheckInNotification(iosSnoozeNotificationId);
@@ -176,8 +176,7 @@ class AlarmScheduler {
 
   Future<void> cancelAllAlarms() async {
     if (Platform.isAndroid) {
-      final String frequency = await StorageService.instance.getCheckinFrequency();
-      await _cancelAndroidManagedAlarms(frequency);
+      await _cancelAllTrackedAlarms();
     } else if (Platform.isIOS) {
       for (int i = 0; i < 30; i++) {
         await NotificationService.instance
@@ -189,9 +188,28 @@ class AlarmScheduler {
   }
 
   Future<void> _cancelAndroidManagedAlarms(String frequency) async {
-    for (final int id in AlarmIds.allManagedIds(frequency)) {
+    await _cancelTrackedAlarms(AlarmIds.allManagedIds(frequency));
+  }
+
+  Future<void> _cancelTrackedAlarms(Iterable<int> ids) async {
+    final Set<int> scheduled =
+        await StorageService.instance.getScheduledAlarmIds();
+    for (final int id in ids) {
+      if (!scheduled.contains(id)) {
+        continue;
+      }
+      await AndroidAlarmManager.cancel(id);
+      await StorageService.instance.removeScheduledAlarmId(id);
+    }
+  }
+
+  Future<void> _cancelAllTrackedAlarms() async {
+    final Set<int> scheduled =
+        await StorageService.instance.getScheduledAlarmIds();
+    for (final int id in scheduled) {
       await AndroidAlarmManager.cancel(id);
     }
+    await StorageService.instance.clearScheduledAlarmIds();
   }
 
   Future<void> _scheduleOneShot({
@@ -210,6 +228,7 @@ class AlarmScheduler {
       rescheduleOnReboot: true,
       allowWhileIdle: true,
     );
+    await StorageService.instance.addScheduledAlarmId(alarmId);
   }
 
   Future<void> _scheduleIosRegularNotifications({

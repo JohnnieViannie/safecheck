@@ -6,9 +6,12 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:safecheck/services/alarm_scheduler.dart';
 import 'package:safecheck/services/alarm_watchdog.dart';
 import 'package:safecheck/services/api_service.dart';
+import 'package:safecheck/services/auth_service.dart';
 import 'package:safecheck/services/background_location_service.dart';
 import 'package:safecheck/services/endpoints.dart';
 import 'package:safecheck/services/notification_service.dart';
+import 'package:safecheck/services/offline_sync_service.dart';
+import 'package:safecheck/services/profile_sync_service.dart';
 import 'package:safecheck/services/push_checkin_service.dart';
 import 'package:safecheck/services/storage_service.dart';
 
@@ -35,12 +38,21 @@ class AppBootstrap {
 
     await NotificationService.instance.initialize();
     await PushCheckinService.instance.initialize();
+    OfflineSyncService.instance.start();
 
     if (loggedIn) {
       await AlarmScheduler.instance.ensureAlarmsScheduled();
       await PushCheckinService.instance.registerTokenIfLoggedIn();
       await BackgroundLocationService.instance.pingIfDue();
       AlarmWatchdog.instance.attach();
+      final String? uid = AuthService.instance.currentUser?.uid;
+      if (uid != null && uid.isNotEmpty) {
+        final profile = await AuthService.instance.getUserProfile(uid);
+        if (profile != null) {
+          await ProfileSyncService.instance.applyFromProfile(profile);
+        }
+      }
+      await OfflineSyncService.instance.flush();
     }
 
     if (Platform.isAndroid) {

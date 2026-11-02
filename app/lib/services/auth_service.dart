@@ -1,15 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safecheck/config/app_config.dart';
 import 'package:safecheck/models/user_model.dart';
 import 'package:safecheck/services/api_service.dart';
 import 'package:safecheck/services/endpoints.dart';
+import 'package:safecheck/services/offline_sync_service.dart';
+import 'package:safecheck/services/profile_sync_service.dart';
 import 'package:safecheck/services/push_checkin_service.dart';
 import 'package:safecheck/services/safety_service.dart';
+import 'package:safecheck/services/storage_service.dart';
 import 'package:safecheck/utils/app_log.dart';
+import 'package:safecheck/services/biometric_service.dart';
 
 class AuthService {
   AuthService._();
@@ -43,13 +48,23 @@ class AuthService {
       _authStateController.add(true);
       final String? uid = prefs.getString('safecheck_user_uid');
       if (uid != null && uid.isNotEmpty) {
-        _currentUser = UserModel(
-          uid: uid,
-          onboardingCompleted: _onboardingCompletedCache ?? false,
-          email: prefs.getString('safecheck_user_email'),
-        );
+        final Map<String, dynamic>? cached =
+            await StorageService.instance.getCachedProfile();
+        if (cached != null) {
+          _currentUser = UserModel.fromMap(<String, dynamic>{
+            ...cached,
+            'uid': uid,
+          });
+        } else {
+          _currentUser = UserModel(
+            uid: uid,
+            onboardingCompleted: _onboardingCompletedCache ?? false,
+            email: prefs.getString('safecheck_user_email'),
+          );
+        }
         unawaited(_refreshProfileInBackground(uid));
       }
+      unawaited(syncBiometricLoginBackup());
       return;
     }
     _onboardingCompletedCache = null;
@@ -61,6 +76,7 @@ class AuthService {
     if (remoteUser != null) {
       _currentUser = remoteUser;
       _onboardingCompletedCache = remoteUser.onboardingCompleted;
+      await ProfileSyncService.instance.applyFromProfile(remoteUser);
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setBool(
         'safecheck_onboarding_completed',
@@ -98,9 +114,41 @@ class AuthService {
       payload: <String, dynamic>{'method': 'auth_session'},
     );
     _authStateController.add(true);
+    await syncBiometricLoginBackup();
+    BiometricLockSession.markUnlocked();
+  }
+
+  Future<void> syncBiometricLoginBackup() async {
+    if (!await BiometricService.instance.isEnabled()) {
+      await BiometricService.instance.clearLoginCredentials();
+      return;
+    }
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = _token ?? prefs.getString('safecheck_token');
+    final String? uid =
+        _currentUser?.uid ?? prefs.getString('safecheck_user_uid');
+    if (token == null ||
+        token.isEmpty ||
+        uid == null ||
+        uid.isEmpty) {
+      return;
+    }
+
+    await BiometricService.instance.saveLoginCredentials(
+      token: token,
+      uid: uid,
+      email: _currentUser?.email ?? prefs.getString('safecheck_user_email'),
+      onboardingCompleted: _onboardingCompletedCache ??
+          prefs.getBool('safecheck_onboarding_completed') ??
+          false,
+    );
   }
 
   Future<void> clearSession() async {
+    if (await BiometricService.instance.isEnabled()) {
+      await syncBiometricLoginBackup();
+    }
     await PushCheckinService.instance.unregisterTokenIfLoggedIn();
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.remove('safecheck_token');
@@ -129,6 +177,7 @@ class AuthService {
       final response = await ApiService.instance.post(
         Endpoints.sendEmailCode,
         body: <String, dynamic>{'email': email, 'password': password},
+        timeout: AppConfig.emailAuthTimeout,
       );
 
       if (response.statusCode == 200) {
@@ -200,6 +249,7 @@ class AuthService {
       final response = await ApiService.instance.post(
         Endpoints.forgotPassword,
         body: <String, dynamic>{'email': email},
+        timeout: AppConfig.emailAuthTimeout,
       );
 
       if (response.statusCode == 200) {
@@ -509,6 +559,26 @@ class AuthService {
 
   Future<UserModel?> getUserProfile(String uid) async {
     try {
+      final List<ConnectivityResult> connectivity =
+          await Connectivity().checkConnectivity();
+      final bool offline = connectivity.every(
+        (ConnectivityResult result) => result == ConnectivityResult.none,
+      );
+      if (offline) {
+        final Map<String, dynamic>? cached =
+            await StorageService.instance.getCachedProfile();
+        if (cached != null) {
+          final UserModel user = UserModel.fromMap(<String, dynamic>{
+            ...cached,
+            'uid': uid,
+          });
+          _currentUser = user;
+          await ProfileSyncService.instance.applyFromProfile(user);
+          return user;
+        }
+        return null;
+      }
+
       final response = await ApiService.instance.get(
         '${Endpoints.userProfile}$uid/',
       );
@@ -516,19 +586,69 @@ class AuthService {
         final data = ApiService.instance.decodeJson<Map<String, dynamic>>(
           response,
         );
+        await StorageService.instance.saveCachedProfile(data);
         final UserModel user = UserModel.fromMap(data);
         _currentUser = user;
+        await ProfileSyncService.instance.applyFromProfile(user);
         return user;
       }
     } catch (_) {
-      // ignore
+      // Fall back to cached profile below.
+    }
+
+    final Map<String, dynamic>? cached =
+        await StorageService.instance.getCachedProfile();
+    if (cached != null) {
+      final UserModel user = UserModel.fromMap(<String, dynamic>{
+        ...cached,
+        'uid': uid,
+      });
+      _currentUser = user;
+      await ProfileSyncService.instance.applyFromProfile(user);
+      return user;
     }
     return null;
   }
 
+  Future<bool> verifyPin({
+    required String uid,
+    required String pin,
+  }) async {
+    if (uid.trim().isEmpty || pin.trim().length != 4) {
+      return false;
+    }
+    if (_token != null && _token!.isNotEmpty) {
+      ApiService.instance.setBearerToken(_token!);
+    }
+    if (ApiService.instance.baseUrl.trim().isEmpty) {
+      ApiService.instance.init(url: Endpoints.baseUrl);
+    }
+
+    try {
+      final response = await ApiService.instance.post(
+        Endpoints.verifyPin,
+        body: <String, dynamic>{
+          'uid': uid,
+          'pin': pin.trim(),
+        },
+      );
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data =
+            ApiService.instance.decodeJson<Map<String, dynamic>>(response);
+        return data['valid'] == true;
+      }
+    } catch (_) {
+      // Fall through to false.
+    }
+    return false;
+  }
+
   String? _lastProfileSaveError;
+  bool _lastSaveQueuedOffline = false;
 
   String? get lastProfileSaveError => _lastProfileSaveError;
+
+  bool get lastSaveQueuedOffline => _lastSaveQueuedOffline;
 
   Future<bool> createOrUpdateUser({
     required String uid,
@@ -536,6 +656,7 @@ class AuthService {
     required Map<String, dynamic> extra,
   }) async {
     _lastProfileSaveError = null;
+    _lastSaveQueuedOffline = false;
     if (uid.trim().isEmpty) {
       appLog('createOrUpdateUser: missing uid');
       return false;
@@ -561,8 +682,20 @@ class AuthService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> data = ApiService.instance
             .decodeJson<Map<String, dynamic>>(response);
+        if (extra.containsKey('emergency_contacts_json')) {
+          final Object? stored = data['emergency_contacts_json'] ??
+              data['emergencyContactsJson'];
+          if (stored == null || stored.toString().trim().isEmpty) {
+            _lastProfileSaveError =
+                'Server did not save contacts. Update the backend (see deploy/SERVER_UPDATE.md).';
+            appLog('createOrUpdateUser: server missing emergency_contacts_json');
+            return false;
+          }
+        }
+        await StorageService.instance.saveCachedProfile(data);
         final UserModel updated = UserModel.fromMap(data);
         _currentUser = updated;
+        await ProfileSyncService.instance.applyFromProfile(updated);
         _onboardingCompletedCache = updated.onboardingCompleted;
         final SharedPreferences prefs = await SharedPreferences.getInstance();
         if (updated.email != null && updated.email!.trim().isNotEmpty) {
@@ -581,10 +714,113 @@ class AuthService {
         'createOrUpdateUser failed: ${response.statusCode} ${response.body}',
       );
     } catch (error) {
+      if (OfflineSyncService.isNetworkError(error)) {
+        final Map<String, dynamic> body = <String, dynamic>{
+          'uid': uid,
+          'phone_number': phoneNumber,
+          ...extra,
+        };
+        await OfflineSyncService.instance.enqueue(
+          type: OfflineSyncService.opUpdateProfile,
+          payload: body,
+        );
+        await _cacheProfileMerge(body);
+        _lastProfileSaveError = null;
+        _lastSaveQueuedOffline = true;
+        return true;
+      }
       _lastProfileSaveError = error.toString();
       appLog('createOrUpdateUser error: $error');
     }
     return false;
+  }
+
+  Future<void> _cacheProfileMerge(Map<String, dynamic> body) async {
+    final Map<String, dynamic>? existing =
+        await StorageService.instance.getCachedProfile();
+    final Map<String, dynamic> merged = <String, dynamic>{
+      if (existing != null) ...existing,
+      ...body,
+    };
+    await StorageService.instance.saveCachedProfile(merged);
+    _currentUser = UserModel.fromMap(merged);
+    await ProfileSyncService.instance.applyFromProfile(_currentUser!);
+    _authStateController.add(true);
+  }
+
+  Future<Map<String, dynamic>?> getOnboardingDraft(String uid) async {
+    if (uid.trim().isEmpty) {
+      return null;
+    }
+    if (_token != null && _token!.isNotEmpty) {
+      ApiService.instance.setBearerToken(_token!);
+    }
+    try {
+      final response = await ApiService.instance.get(
+        '${Endpoints.onboardingDraft}$uid/',
+      );
+      if (response.statusCode != 200) {
+        return null;
+      }
+      final Map<String, dynamic> data = ApiService.instance
+          .decodeJson<Map<String, dynamic>>(response);
+      if (data['onboarding_completed'] == true) {
+        return null;
+      }
+      final Map<String, dynamic>? draft =
+          data['draft'] as Map<String, dynamic>?;
+      if (draft == null) {
+        return null;
+      }
+      final int? step = data['step'] as int?;
+      if (step != null) {
+        draft['step'] = step;
+      }
+      return draft;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> saveOnboardingDraft({
+    required String uid,
+    required int step,
+    required Map<String, dynamic> draft,
+  }) async {
+    if (uid.trim().isEmpty) {
+      return;
+    }
+    if (_token != null && _token!.isNotEmpty) {
+      ApiService.instance.setBearerToken(_token!);
+    }
+    try {
+      await ApiService.instance.post(
+        Endpoints.onboardingDraft,
+        body: <String, dynamic>{
+          'uid': uid,
+          'step': step,
+          'draft': draft,
+        },
+      );
+    } catch (_) {
+      // Non-fatal — local draft remains the fallback.
+    }
+  }
+
+  Future<void> clearOnboardingDraftOnServer(String uid) async {
+    if (uid.trim().isEmpty) {
+      return;
+    }
+    if (_token != null && _token!.isNotEmpty) {
+      ApiService.instance.setBearerToken(_token!);
+    }
+    try {
+      await ApiService.instance.delete(
+        '${Endpoints.onboardingDraft}$uid/clear/',
+      );
+    } catch (_) {
+      // Non-fatal.
+    }
   }
 
   String? _extractApiError(String body) {
@@ -604,5 +840,49 @@ class AuthService {
 
   Future<void> signOut() async {
     await clearSession();
+  }
+
+  Future<void> signInWithBiometrics({
+    required void Function(UserModel user) onSuccess,
+    required void Function(String message) onError,
+  }) async {
+    if (!await BiometricService.instance.canUnlockApp()) {
+      onError(
+        'Set up fingerprint or Face ID in your phone settings first.',
+      );
+      return;
+    }
+    if (!await BiometricService.instance.hasStoredLogin()) {
+      onError(
+        'No saved account for biometric sign-in. Log in once and enable biometric unlock in Settings.',
+      );
+      return;
+    }
+
+    final BiometricAuthResult auth = await BiometricService.instance.authenticate(
+      reason: 'Sign in to SafeCheck',
+      biometricOnly: true,
+    );
+    if (!auth.success) {
+      if (auth.errorMessage != null && auth.errorMessage!.isNotEmpty) {
+        onError(auth.errorMessage!);
+      }
+      return;
+    }
+
+    final BiometricLoginCredentials? credentials =
+        await BiometricService.instance.readLoginCredentials();
+    if (credentials == null) {
+      onError('Could not restore your saved session. Log in with email instead.');
+      return;
+    }
+
+    final UserModel user = UserModel(
+      uid: credentials.uid,
+      onboardingCompleted: credentials.onboardingCompleted,
+      email: credentials.email,
+    );
+    await _saveSession(token: credentials.token, user: user);
+    onSuccess(_currentUser ?? user);
   }
 }

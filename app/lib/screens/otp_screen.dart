@@ -85,7 +85,7 @@ class _OtpScreenState extends State<OtpScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               const SizedBox(height: 20),
-              Text('Enter the code sent to ${widget.phoneNumber}', style: const TextStyle(fontSize: 16)),
+              Text('If ${widget.phoneNumber} is registered, we sent it a code. Enter it below.', style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 16),
               InputField(
                 controller: _otpController,

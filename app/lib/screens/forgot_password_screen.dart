@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:safecheck/screens/reset_password_screen.dart';
 import 'package:safecheck/services/auth_service.dart';
-import 'package:safecheck/theme.dart';
+import 'package:safecheck/widgets/auth_screen_shell.dart';
 import 'package:safecheck/widgets/custom_button.dart';
 import 'package:safecheck/widgets/input_field.dart';
 
@@ -41,14 +41,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       onCodeSent: (String verificationId) {
         if (!mounted) return;
         setState(() => _loading = false);
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ResetPasswordScreen(
-              email: email,
-              verificationId: verificationId,
+        authDismissKeyboardAndRun(context, () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ResetPasswordScreen(
+                email: email,
+                verificationId: verificationId,
+              ),
             ),
-          ),
-        );
+          );
+        });
       },
       onError: (String message) {
         if (!mounted) return;
@@ -68,105 +70,51 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Forgot password'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 12,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+    return AuthScreenScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AuthScreenColors.accent.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.lock_reset_outlined,
+              size: 32,
+              color: AuthScreenColors.accent,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  Icons.lock_reset_outlined,
-                  size: 32,
-                  color: AppTheme.primary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Reset your password',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
+          const SizedBox(height: 24),
+          const AuthHeadline(
+            primary: 'Reset your\n',
+            accent: 'password.',
+          ),
+          const SizedBox(height: 14),
+          const AuthBodyText(
+            text:
                 'Enter the email for your account. We will send a 6-digit code to reset your password.',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: isDark ? Colors.white60 : Colors.black54,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 28),
-              InputField(
-                controller: _emailController,
-                label: 'Email Address',
-                hint: 'you@example.com',
-                keyboardType: TextInputType.emailAddress,
-              ),
-              if (_error != null) ...<Widget>[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 32),
-              CustomButton(
-                label: 'Send reset code',
-                loading: _loading,
-                onPressed: _sendResetCode,
-              ),
-            ],
           ),
-        ),
+          const SizedBox(height: 28),
+          InputField(
+            controller: _emailController,
+            label: 'Email Address',
+            hint: 'you@example.com',
+            keyboardType: TextInputType.emailAddress,
+          ),
+          if (_error != null) ...<Widget>[
+            const SizedBox(height: 14),
+            AuthErrorBanner(message: _error!),
+          ],
+          const SizedBox(height: 32),
+          CustomButton(
+            label: 'Send reset code  →',
+            backgroundColor: AuthScreenColors.accent,
+            loading: _loading,
+            onPressed: _sendResetCode,
+          ),
+        ],
       ),
     );
   }

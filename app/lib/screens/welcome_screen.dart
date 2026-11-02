@@ -1,15 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:safecheck/config/app_config.dart';
-import 'package:safecheck/screens/create_account_screen.dart';
-import 'package:safecheck/screens/email_input_screen.dart';
-import 'package:safecheck/utils/app_log.dart';
-import 'package:safecheck/utils/auth_navigation.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:safecheck/services/auth_service.dart';
+import 'package:safecheck/screens/login_screen.dart';
 import 'package:safecheck/theme.dart';
-import 'package:safecheck/widgets/app_logo.dart';
+import 'package:safecheck/widgets/auth_screen_shell.dart';
 import 'package:safecheck/widgets/custom_button.dart';
-import 'package:safecheck/widgets/social_sign_in_button.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -20,9 +13,9 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen>
     with SingleTickerProviderStateMixin {
-  bool _isLoading = false;
-  bool _googleLoading = false;
-  bool _appleLoading = false;
+  static const Color _background = AuthScreenColors.background;
+  static const Color _cardBackground = AuthScreenColors.card;
+  static const Color _accent = AuthScreenColors.accent;
 
   late AnimationController _animController;
   late Animation<double> _fadeIn;
@@ -39,7 +32,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       parent: _animController,
       curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
     );
-    _slideUp = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
+    _slideUp = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
         .animate(
           CurvedAnimation(
             parent: _animController,
@@ -55,292 +48,169 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     super.dispose();
   }
 
-  Future<void> _openUrl(String url) async {
-    final Uri uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open $url')),
-      );
-    }
-  }
-
-  Future<void> _onContinueWithEmail() async {
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 250));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
+  void _onExistingAccount() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const EmailInputScreen(
-          skipIfLoggedIn: false,
-          mode: AuthFlowMode.login,
-        ),
+        builder: (_) => const LoginScreen(),
       ),
     );
-  }
-
-  void _onCreateAccount() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const CreateAccountScreen(),
-      ),
-    );
-  }
-
-  Future<void> _onGoogleSignIn() async {
-    setState(() => _googleLoading = true);
-    await AuthService.instance.signInWithGoogle(
-      onSuccess: (user) async {
-        if (!mounted) return;
-        await AuthNavigation.routeAfterAuth(context, user);
-      },
-      onError: (msg) {
-        if (!mounted) return;
-        if (msg.toLowerCase().contains('cancelled')) {
-          // User dismissed the account picker; do not show noisy error UI.
-          return;
-        }
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
-        appLog(msg);
-      },
-    );
-    if (mounted) setState(() => _googleLoading = false);
-  }
-
-  Future<void> _onAppleSignIn() async {
-    setState(() => _appleLoading = true);
-    // TODO: Integrate real Apple Sign-In (sign_in_with_apple package).
-    await AuthService.instance.socialSignIn(
-      provider: 'apple',
-      onSuccess: (user) async {
-        if (!mounted) return;
-        await AuthNavigation.routeAfterAuth(context, user);
-      },
-      onError: (msg) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
-      },
-    );
-    if (mounted) setState(() => _appleLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeIn,
-          child: SlideTransition(
-            position: _slideUp,
-            child: LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                return SingleChildScrollView(
-                  padding: AppTheme.screenPadding,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
+    return Theme(
+      data: AppTheme.darkTheme.copyWith(
+        scaffoldBackgroundColor: _background,
+      ),
+      child: Scaffold(
+        backgroundColor: _background,
+        body: SafeArea(
+          child: FadeTransition(
+            opacity: _fadeIn,
+            child: SlideTransition(
+              position: _slideUp,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const AuthBrandHeader(),
+                    const SizedBox(height: 28),
+                    _buildHeadline(),
+                    const SizedBox(height: 14),
+                    _buildIntro(),
+                    const SizedBox(height: 28),
+                    _FeatureCard(
+                      background: _cardBackground,
+                      icon: Icons.alarm_rounded,
+                      iconColor: const Color(0xFFF472B6),
+                      title: 'Daily check-in, your way.',
+                      description:
+                          'Set your own schedule — daily, weekly, or monthly.',
                     ),
-                    child: IntrinsicHeight(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          const Spacer(flex: 2),
-
-                          const AppLogo(height: 72),
-                          const SizedBox(height: 28),
-
-                          // Headline
-                          Text(
-                            'Scheduled safety calls.\nReal guardian alerts.',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              height: 1.15,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Set your check-in time. If we do not hear "I am fine," SafeCheck retries your call and alerts your next of kin with your last location.',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isDark ? Colors.white60 : Colors.black54,
-                              height: 1.4,
-                            ),
-                          ),
-
-                          const Spacer(flex: 3),
-
-                          // Email sign-in (primary)
-                          CustomButton(
-                            label: 'Continue with Email',
-                            onPressed: _onContinueWithEmail,
-                            loading: _isLoading,
-                          ),
-                          if (AppConfig.enableSocialSignIn) ...<Widget>[
-                            const SizedBox(height: 14),
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: Divider(
-                                    color: isDark
-                                        ? Colors.white24
-                                        : Colors.grey.shade300,
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                  ),
-                                  child: Text(
-                                    'or',
-                                    style: TextStyle(
-                                      color: isDark
-                                          ? Colors.white38
-                                          : Colors.grey.shade500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Divider(
-                                    color: isDark
-                                        ? Colors.white24
-                                        : Colors.grey.shade300,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 14),
-                            if (AppConfig.enableGoogleSignIn) ...<Widget>[
-                              SocialSignInButton(
-                                label: 'Continue with Google',
-                                loading: _googleLoading,
-                                icon: const Icon(
-                                  Icons.g_mobiledata,
-                                  size: 28,
-                                  color: Colors.red,
-                                ),
-                                onPressed: _onGoogleSignIn,
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                            if (AppConfig.enableAppleSignIn)
-                              SocialSignInButton(
-                                label: 'Continue with Apple',
-                                loading: _appleLoading,
-                                icon: Icon(
-                                  Icons.apple,
-                                  size: 24,
-                                  color: isDark ? Colors.white : Colors.black,
-                                ),
-                                onPressed: _onAppleSignIn,
-                              ),
-                          ],
-
-                          const SizedBox(height: 16),
-
-                          Center(
-                            child: Wrap(
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: <Widget>[
-                                Text(
-                                  'Don\'t have an account? ',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark
-                                        ? Colors.white38
-                                        : Colors.grey.shade600,
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: _onCreateAccount,
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text('Create account'),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          Center(
-                            child: Wrap(
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: <Widget>[
-                                Text(
-                                  'By continuing you agree to our ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? Colors.white30
-                                        : Colors.grey.shade500,
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () => _openUrl(AppConfig.termsUrl),
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text(
-                                    'Terms',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                                Text(
-                                  ' & ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? Colors.white30
-                                        : Colors.grey.shade500,
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      _openUrl(AppConfig.privacyUrl),
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text(
-                                    'Privacy Policy',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ),
+                    const SizedBox(height: 12),
+                    _FeatureCard(
+                      background: _cardBackground,
+                      icon: Icons.notifications_off_rounded,
+                      iconColor: const Color(0xFFFBBF24),
+                      title: 'Silent protection.',
+                      description:
+                          'Runs in the background. Only acts when you don\'t respond.',
                     ),
-                  ),
-                );
-              },
+                    const SizedBox(height: 12),
+                    _FeatureCard(
+                      background: _cardBackground,
+                      icon: Icons.location_on_rounded,
+                      iconColor: const Color(0xFFF472B6),
+                      title: 'Alerts your people.',
+                      description:
+                          'SMS, WhatsApp, email — with your last known location.',
+                    ),
+                    const SizedBox(height: 32),
+                    CustomButton(
+                      label: 'Log in  →',
+                      backgroundColor: _accent,
+                      onPressed: _onExistingAccount,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeadline() {
+    return RichText(
+      text: const TextSpan(
+        style: TextStyle(
+          fontSize: 34,
+          height: 1.15,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Georgia',
+        ),
+        children: <TextSpan>[
+          TextSpan(
+            text: 'Someone\'s Always\n',
+            style: TextStyle(color: Colors.white),
+          ),
+          TextSpan(
+            text: 'Checking On You.',
+            style: TextStyle(color: _accent),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIntro() {
+    return Text(
+      'SafeCheck quietly monitors that you\'re okay. If you ever can\'t respond, it acts on your behalf — alerting the people who care about you.',
+      style: TextStyle(
+        fontSize: 15,
+        height: 1.5,
+        color: Colors.white.withValues(alpha: 0.62),
+      ),
+    );
+  }
+}
+
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({
+    required this.background,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.description,
+  });
+
+  final Color background;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: Colors.white.withValues(alpha: 0.55),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

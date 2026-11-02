@@ -56,11 +56,13 @@ class SocialSignInButton extends StatelessWidget {
                       (isDark ? Colors.white : Colors.black54),
                 ),
               )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  icon,
-                  const SizedBox(width: 12),
+            : Stack(
+                alignment: Alignment.center,
+                children: <Widget>[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: icon,
+                  ),
                   Text(
                     label,
                     style: TextStyle(

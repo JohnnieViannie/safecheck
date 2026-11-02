@@ -2,25 +2,22 @@
 
 ## 1. Backend (Django)
 
-1. Copy `server/.env.example` to `server/.env` and set:
-   - `DJANGO_DEBUG=False`
+1. Copy `backend/.env.example` to `backend/.env` and set:
+   - `DJANGO_DEBUG=0`
    - `SAFECHECK_ALLOW_MOCK_AUTH=false`
    - Strong `DJANGO_SECRET_KEY`
-   - `DJANGO_DEBUG=False` (enforces safebangle.com hosts only; no `*` or localhost)
-   - Optional `DJANGO_ALLOWED_HOSTS` — defaults to `safebangle.com`, `www.safebangle.com`, `api.safebangle.com`
-   - Optional `DJANGO_CSRF_TRUSTED_ORIGINS` — defaults to `https://safebangle.com`, `https://www.safebangle.com`, `https://api.safebangle.com`
    - Production database (`DATABASE_URL` recommended)
-   - SMTP vars (`EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_FROM`)
+   - SMTP vars (`EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL`)
    - Africa's Talking credentials for SMS/voice
    - `CALLBACK_BASE_URL` to your public HTTPS API
    - `FIREBASE_CREDENTIALS_PATH` for server push fallback
 
-2. Deploy the API behind HTTPS (e.g. `https://api.safebangle.com/api`).
+2. Deploy the API behind HTTPS (e.g. `https://server.safebangle.com/api`).
 
-3. Run the check-in scheduler every minute (see `server/SCHEDULER_DEPLOY.md`):
+3. Run the check-in scheduler (cron / systemd timer):
    ```powershell
-   cd server
-   .\run_scheduler.ps1
+   cd backend
+   python manage.py run_checkin_scheduler
    ```
 
 4. Rotate any credentials that were ever committed to git.

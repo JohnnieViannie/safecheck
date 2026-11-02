@@ -31,10 +31,23 @@ class PhoneNumberService {
     required String rawInput,
     required String isoCode,
   }) {
+    final String trimmed = rawInput.trim();
+    if (trimmed.startsWith('+')) {
+      try {
+        final PhoneNumber number = PhoneNumber.parse(trimmed);
+        if (!number.isValid()) {
+          return null;
+        }
+        return number.nsn;
+      } catch (_) {
+        return null;
+      }
+    }
+
     if (normalizeLocalToE164(rawInput: rawInput, isoCode: isoCode) == null) {
       return null;
     }
-    final String digitsOnly = rawInput.trim().replaceAll(RegExp(r'[^0-9]'), '');
+    final String digitsOnly = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
     return digitsOnly.isEmpty ? null : digitsOnly;
   }
 

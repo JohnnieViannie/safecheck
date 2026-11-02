@@ -49,6 +49,12 @@ dependencies:
   firebase_messaging: ^15.1.6
   flutter_timezone: ^4.1.0
   url_launcher: ^6.3.1
+  flutter_svg: ^2.3.0
+  file_picker: ^8.3.7
+  path_provider: ^2.1.6
+  share_plus: ^10.1.4
+  connectivity_plus: ^7.3.1
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -84,6 +90,11 @@ flutter:
   assets:
     - assets/logo.png
     - assets/dark_mode_logo.png
+    - assets/google_logo.svg
+    - assets/icons/nav_home.svg
+    - assets/icons/nav_checkin.svg
+    - assets/icons/nav_history.svg
+    - assets/icons/nav_contacts.svg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

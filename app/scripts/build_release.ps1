@@ -1,5 +1,5 @@
 param(
-    [string]$ApiBaseUrl = "https://safebangle.com/api",
+    [string]$ApiBaseUrl = "https://server.safebangle.com/api",
     [ValidateSet("apk", "appbundle")]
     [string]$Target = "apk"
 )
@@ -33,7 +33,7 @@ if ($Target -eq "apk") {
     Write-Host "API base URL baked in: $ApiBaseUrl"
     Write-Host ""
     Write-Host "Upload to VPS:"
-    Write-Host "  scp `"$PublishApk`" root@YOUR_VPS:/var/www/safebangle/public/safecheck.apk"
+    Write-Host "  scp `"$PublishApk`" root@YOUR_VPS:/var/www/safecheck/public/safecheck.apk"
     Write-Host ""
     Write-Host "Download URL after upload:"
     Write-Host "  https://safebangle.com/safecheck.apk"

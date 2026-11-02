@@ -1,12 +1,10 @@
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:flutter_callkit_incoming/entities/entities.dart';
-import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:safecheck/services/alarm_ids.dart';
 import 'package:safecheck/services/alarm_schedule_logic.dart';
 import 'package:safecheck/services/background_alarm_init.dart';
 import 'package:safecheck/services/call_dedup_service.dart';
 import 'package:safecheck/services/notification_service.dart';
+import 'package:safecheck/services/pending_call_service.dart';
 import 'package:safecheck/services/storage_service.dart';
 import 'package:safecheck/utils/app_log.dart';
 
@@ -28,7 +26,7 @@ Future<void> checkinAlarmCallback(int alarmId) async {
     }
 
     if (AlarmIds.shouldRing(alarmId)) {
-      await _ringAndShowCallkit(alarmId: alarmId);
+      await _ringAndShowCall(alarmId: alarmId);
     }
   } catch (error, stack) {
     appLog('checkinAlarmCallback failed: $error\n$stack');
@@ -51,9 +49,7 @@ Future<void> _rescheduleAllFromBackground() async {
   final DateTime now = DateTime.now();
   final int horizon = AlarmIds.horizonForFrequency(frequency);
 
-  for (final int id in AlarmIds.allManagedIds(frequency)) {
-    await AndroidAlarmManager.cancel(id);
-  }
+  await _cancelAllTrackedAlarmsBackground();
 
   final List<DateTime> occurrences = AlarmScheduleLogic.rollingOccurrences(
     now: now,
@@ -91,9 +87,9 @@ Future<void> _scheduleRetriesFromBackground({
     maxSlots: AlarmIds.retrySlots,
   );
 
-  for (int i = 0; i < AlarmIds.retrySlots; i++) {
-    await AndroidAlarmManager.cancel(AlarmIds.retryBase + i);
-  }
+  await _cancelTrackedAlarmsBackground(
+    List<int>.generate(AlarmIds.retrySlots, (int i) => AlarmIds.retryBase + i),
+  );
 
   for (int i = 0; i < retries.length; i++) {
     await _scheduleOneShotBackground(
@@ -119,9 +115,31 @@ Future<void> _scheduleOneShotBackground({
     rescheduleOnReboot: true,
     allowWhileIdle: true,
   );
+  await StorageService.instance.addScheduledAlarmId(alarmId);
 }
 
-Future<void> _ringAndShowCallkit({required int alarmId}) async {
+Future<void> _cancelTrackedAlarmsBackground(Iterable<int> ids) async {
+  final Set<int> scheduled =
+      await StorageService.instance.getScheduledAlarmIds();
+  for (final int id in ids) {
+    if (!scheduled.contains(id)) {
+      continue;
+    }
+    await AndroidAlarmManager.cancel(id);
+    await StorageService.instance.removeScheduledAlarmId(id);
+  }
+}
+
+Future<void> _cancelAllTrackedAlarmsBackground() async {
+  final Set<int> scheduled =
+      await StorageService.instance.getScheduledAlarmIds();
+  for (final int id in scheduled) {
+    await AndroidAlarmManager.cancel(id);
+  }
+  await StorageService.instance.clearScheduledAlarmIds();
+}
+
+Future<void> _ringAndShowCall({required int alarmId}) async {
   final String frequency = await StorageService.instance.getCheckinFrequency();
   final String checkinTime =
       (await StorageService.instance.getCheckinTime()) ?? '18:00';
@@ -141,62 +159,24 @@ Future<void> _ringAndShowCallkit({required int alarmId}) async {
   );
   if (!show) return;
 
-  try {
-    await FlutterRingtonePlayer().playAlarm();
-  } catch (_) {
-    // Ringtone may fail in isolate; CallKit/notification still attempted.
-  }
+  await PendingCallService.instance.save(
+    PendingCallPayload(
+      callKitId: callKitId,
+      scheduledFor: now,
+      frequency: frequency,
+      checkinTime: checkinTime,
+      alarmId: alarmId,
+      source: 'local_alarm',
+    ),
+  );
 
-  try {
-    final CallKitParams params = CallKitParams(
-      id: callKitId,
-      nameCaller: 'SafeCheck',
-      handle: 'SafeCheck',
-      type: 0,
-      duration: 30000,
-      textAccept: 'Accept',
-      textDecline: 'Decline',
-      missedCallNotification: const NotificationParams(
-        showNotification: true,
-        isShowCallback: true,
-        subtitle: 'Missed call',
-        callbackText: 'Call back',
-      ),
-      callingNotification: const NotificationParams(
-        showNotification: false,
-        isShowCallback: true,
-        subtitle: 'Calling...',
-        callbackText: 'Hang Up',
-      ),
-      extra: <String, dynamic>{
-        'scheduledFor': now.toIso8601String(),
-        'frequency': frequency,
-        'checkinTime': checkinTime,
-        'alarmId': alarmId,
-        'callKitId': callKitId,
-        'source': 'local_alarm',
-      },
-      android: const AndroidParams(
-        isCustomNotification: true,
-        isShowLogo: false,
-        isShowCallID: false,
-        ringtonePath: 'system_ringtone_default',
-        incomingCallNotificationChannelName: 'Incoming call',
-        missedCallNotificationChannelName: 'Missed call',
-        isShowFullLockedScreen: true,
-      ),
-      ios: const IOSParams(
-        handleType: 'generic',
-        audioSessionMode: 'default',
-        audioSessionActive: true,
-        ringtonePath: 'system_ringtone_default',
-        iconName: 'CallKitLogo',
-      ),
-    );
-
-    await FlutterCallkitIncoming.showCallkitIncoming(params);
-  } catch (error, stack) {
-    appLog('CallKit from background failed: $error\n$stack');
-    await NotificationService.showBackgroundIncomingCallFallback();
-  }
+  await NotificationService.showIncomingCheckinCallBackground(
+    callKitId: callKitId,
+    scheduledFor: now,
+    frequency: frequency,
+    checkinTime: checkinTime,
+    alarmId: alarmId,
+    snoozed: alarmId == AlarmIds.snooze,
+    source: 'local_alarm',
+  );
 }

@@ -2,7 +2,7 @@
 # Run on the VPS once to prepare APK hosting at https://safebangle.com/safecheck.apk
 set -euo pipefail
 
-PUBLIC_DIR="/var/www/safebangle/public"
+PUBLIC_DIR="/var/www/safecheck/public"
 APK_PATH="${PUBLIC_DIR}/safecheck.apk"
 
 mkdir -p "${PUBLIC_DIR}"

@@ -1,5 +1,7 @@
 # Secrets and local environment
+backend/.env
 server/.env
+server_legacy_backup/
 **/.env
 **/.env.local
 **/key.properties
@@ -21,3 +23,9 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Release APK (build locally, upload to VPS)
+deploy/public/safecheck.apk
+
+# Uploaded files
+backend/media/

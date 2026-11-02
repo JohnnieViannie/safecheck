@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:safecheck/theme.dart';
+import 'package:safecheck/widgets/auth_screen_shell.dart';
 
 class AuthStepIndicator extends StatelessWidget {
   const AuthStepIndicator({
@@ -7,17 +8,22 @@ class AuthStepIndicator extends StatelessWidget {
     required this.currentStep,
     required this.totalSteps,
     this.labels = const <String>['Account', 'Verify', 'Profile'],
+    this.brightOnDark = false,
   });
 
   final int currentStep;
   final int totalSteps;
   final List<String> labels;
+  final bool brightOnDark;
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color inactive = isDark ? Colors.white24 : Colors.grey.shade300;
-    final Color active = AppTheme.primary;
+    final bool isDark = brightOnDark ||
+        Theme.of(context).brightness == Brightness.dark;
+    final Color inactive =
+        brightOnDark ? Colors.white24 : (isDark ? Colors.white24 : Colors.grey.shade300);
+    final Color active =
+        brightOnDark ? AuthScreenColors.accent : AppTheme.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,9 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter_tts/flutter_tts.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:safecheck/services/notification_service.dart';
+import 'package:safecheck/services/ringtone_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -213,15 +214,7 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
   void _startRinging() {
     _ringTimer?.cancel();
     _incomingTimeoutTimer?.cancel();
-    try {
-      FlutterRingtonePlayer().playRingtone(
-        volume: 1.0,
-        looping: true,
-        asAlarm: true,
-      );
-    } catch (_) {
-      // Keep haptic/system alert fallback if plugin is unavailable on device.
-    }
+    unawaited(RingtoneService.startRinging());
     _ringTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (_accepted) return;
       HapticFeedback.mediumImpact();
@@ -250,11 +243,7 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
     _ringTimer = null;
     _incomingTimeoutTimer?.cancel();
     _incomingTimeoutTimer = null;
-    try {
-      FlutterRingtonePlayer().stop();
-    } catch (_) {
-      // Ignore stop failures silently.
-    }
+    unawaited(RingtoneService.stopAll());
   }
 
   void _acceptCall() {
@@ -563,6 +552,7 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
   @override
   void dispose() {
     _stopRinging();
+    unawaited(NotificationService.instance.cancelIncomingCheckinCall());
     _stopListening();
     unawaited(_safeStopTts(location: 'dispose'));
     _clockTimer?.cancel();
@@ -575,7 +565,6 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
     final double screenHeight = MediaQuery.of(context).size.height;
     final bool isCompact = screenHeight < 760;
     final double topGap = isCompact ? 14 : 40;
-    final double avatarSize = isCompact ? 112 : 140;
     final double titleSize = isCompact ? 26 : 32;
     final double midGap = isCompact ? 20 : 32;
     final double preAnswerGap = isCompact ? 24 : 48;
@@ -611,39 +600,14 @@ class _SimulatedCallScreenState extends State<SimulatedCallScreen>
                   animation: _pulseController,
                   builder: (context, child) {
                     final scale = 1.0 + (_pulseController.value * 0.08);
+                    final double brandSize = isCompact ? 72 : 88;
+                    final double logoSize = isCompact ? 46 : 56;
                     return Transform.scale(
                       scale: scale,
                       child: Center(
-                        child: Container(
-                          width: avatarSize,
-                          height: avatarSize,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.greenAccent.withValues(alpha: 0.75),
-                              width: 5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.withValues(alpha: 0.35),
-                                blurRadius: 40,
-                                spreadRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: ClipOval(
-                            child: ColoredBox(
-                              color: const Color(0xFF1E2A44),
-                              child: Padding(
-                                padding: EdgeInsets.all(avatarSize * 0.14),
-                                child: Image.asset(
-                                  AppLogo.darkAssetPath,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.high,
-                                ),
-                              ),
-                            ),
-                          ),
+                        child: SafeCheckBrandLogo(
+                          size: brandSize,
+                          logoSize: logoSize,
                         ),
                       ),
                     );

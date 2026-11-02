@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:safecheck/firebase_options.dart';
 import 'package:safecheck/services/api_service.dart';
 import 'package:safecheck/services/auth_service.dart';
@@ -13,6 +13,8 @@ import 'package:safecheck/utils/app_log.dart';
 import 'package:safecheck/services/background_alarm_init.dart';
 import 'package:safecheck/services/call_dedup_service.dart';
 import 'package:safecheck/services/endpoints.dart';
+import 'package:safecheck/services/notification_service.dart';
+import 'package:safecheck/services/pending_call_service.dart';
 
 /// Handles server-driven FCM pushes that wake the app for check-in calls.
 class PushCheckinService {
@@ -61,59 +63,89 @@ class PushCheckinService {
     );
     if (!show) return;
 
-    if (fromBackground) {
-      try {
-        await FlutterRingtonePlayer().playAlarm();
-      } catch (_) {}
-    }
-
-    final CallKitParams params = CallKitParams(
-      id: callKitId,
-      nameCaller: 'SafeCheck',
-      handle: 'SafeCheck',
-      type: 0,
-      duration: 30000,
-      textAccept: 'Accept',
-      textDecline: 'Decline',
-      missedCallNotification: const NotificationParams(
-        showNotification: true,
-        isShowCallback: true,
-        subtitle: 'Missed call',
-        callbackText: 'Call back',
-      ),
-      callingNotification: const NotificationParams(
-        showNotification: false,
-        isShowCallback: true,
-        subtitle: 'Calling...',
-        callbackText: 'Hang Up',
-      ),
-      extra: <String, dynamic>{
-        'scheduledFor': scheduledFor.toIso8601String(),
-        'frequency': frequency,
-        'checkinTime': checkinTime,
-        'alarmId': alarmId,
-        'callKitId': callKitId,
-        'source': 'fcm',
-      },
-      android: const AndroidParams(
-        isCustomNotification: true,
-        isShowLogo: false,
-        isShowCallID: false,
-        ringtonePath: 'system_ringtone_default',
-        incomingCallNotificationChannelName: 'Incoming call',
-        missedCallNotificationChannelName: 'Missed call',
-        isShowFullLockedScreen: true,
-      ),
-      ios: const IOSParams(
-        handleType: 'generic',
-        audioSessionMode: 'default',
-        audioSessionActive: true,
-        ringtonePath: 'system_ringtone_default',
-        iconName: 'CallKitLogo',
+    await PendingCallService.instance.save(
+      PendingCallPayload(
+        callKitId: callKitId,
+        scheduledFor: scheduledFor,
+        frequency: frequency,
+        checkinTime: checkinTime,
+        alarmId: alarmId,
+        source: 'fcm',
       ),
     );
 
-    await FlutterCallkitIncoming.showCallkitIncoming(params);
+    if (Platform.isIOS) {
+      final CallKitParams params = CallKitParams(
+        id: callKitId,
+        nameCaller: 'SafeCheck',
+        handle: 'SafeCheck',
+        type: 0,
+        duration: 30000,
+        textAccept: 'Accept',
+        textDecline: 'Decline',
+        missedCallNotification: const NotificationParams(
+          showNotification: true,
+          isShowCallback: true,
+          subtitle: 'Missed call',
+          callbackText: 'Call back',
+        ),
+        callingNotification: const NotificationParams(
+          showNotification: false,
+          isShowCallback: true,
+          subtitle: 'Calling...',
+          callbackText: 'Hang Up',
+        ),
+        extra: <String, dynamic>{
+          'scheduledFor': scheduledFor.toIso8601String(),
+          'frequency': frequency,
+          'checkinTime': checkinTime,
+          'alarmId': alarmId,
+          'callKitId': callKitId,
+          'source': 'fcm',
+        },
+        android: const AndroidParams(
+          isCustomNotification: true,
+          isShowLogo: false,
+          isShowCallID: false,
+          ringtonePath: 'system_ringtone_default',
+          incomingCallNotificationChannelName: 'Incoming call',
+          missedCallNotificationChannelName: 'Missed call',
+          isShowFullLockedScreen: true,
+        ),
+        ios: const IOSParams(
+          handleType: 'generic',
+          audioSessionMode: 'default',
+          audioSessionActive: true,
+          ringtonePath: 'system_ringtone_default',
+          iconName: 'CallKitLogo',
+        ),
+      );
+      await FlutterCallkitIncoming.showCallkitIncoming(params);
+      return;
+    }
+
+    if (fromBackground) {
+      await NotificationService.showIncomingCheckinCallBackground(
+        callKitId: callKitId,
+        scheduledFor: scheduledFor,
+        frequency: frequency,
+        checkinTime: checkinTime,
+        alarmId: alarmId,
+        snoozed: snoozed,
+        source: 'fcm',
+      );
+    } else {
+      await NotificationService.instance.showIncomingCheckinCall(
+        callKitId: callKitId,
+        scheduledFor: scheduledFor,
+        frequency: frequency,
+        checkinTime: checkinTime,
+        alarmId: alarmId,
+        snoozed: snoozed,
+        source: 'fcm',
+      );
+      NotificationService.onIncomingCallOpened?.call();
+    }
   }
 
   Future<void> initialize() async {

@@ -48,3 +48,45 @@ class AppLogo extends StatelessWidget {
     );
   }
 }
+
+/// Teal tile + light logo — matches login / welcome screens.
+class SafeCheckBrandLogo extends StatelessWidget {
+  const SafeCheckBrandLogo({
+    super.key,
+    this.size = 56,
+    this.logoSize = 36,
+    this.cornerRadius = 14,
+    this.innerCornerRadius = 8,
+    this.accentColor = const Color(0xFF14B8A6),
+  });
+
+  final double size;
+  final double logoSize;
+  final double cornerRadius;
+  final double innerCornerRadius;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: accentColor,
+        borderRadius: BorderRadius.circular(cornerRadius),
+      ),
+      child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(innerCornerRadius),
+          child: Image.asset(
+            AppLogo.lightAssetPath,
+            width: logoSize,
+            height: logoSize,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.high,
+          ),
+        ),
+      ),
+    );
+  }
+}

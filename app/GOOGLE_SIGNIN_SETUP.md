@@ -89,7 +89,7 @@ The app and Firebase must use OAuth clients from the **same** Google Cloud / Fir
 
 ## Verify API is reachable
 
-Google may succeed but login still fails if the backend is unreachable. Default API URL is `https://safebangle.com/api`. For local dev:
+Google may succeed but login still fails if the backend is unreachable. Default API URL is `https://server.safebangle.com/api`. For local dev:
 
 ```powershell
 flutter run --dart-define=SAFECHECK_API_BASE_URL=http://YOUR_LAN_IP:8000/api

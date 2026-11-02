@@ -1,0 +1,29 @@
+# Versions pinned to the set the backend test suite passes on. Needs Python 3.10 or newer.
+
+# --- Core framework (Blaces + SafeCheck unified) ---
+Django==5.2.18
+djangorestframework==3.17.1
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.9.0
+django-filter==26.2
+python-dotenv==1.2.4
+
+# --- Database drivers (pick via DATABASE_URL or DB_ENGINE in .env) ---
+psycopg[binary]==3.3.4        # PostgreSQL
+# MySQL / MariaDB. On Debian/Ubuntu, first run:
+#   apt install build-essential pkg-config python3-dev default-libmysqlclient-dev
+mysqlclient==2.2.8
+
+# --- Profile pictures ---
+Pillow==13.0.0
+
+# --- API & integrations ---
+requests==2.34.2              # SMS/voice HTTP (KaCyber, Africa's Talking, OpenCellID, Nominatim)
+phonenumbers==9.0.30          # E.164 phone numbers and time zones
+firebase-admin==7.4.0         # FCM push for check-in calls (mobile)
+
+# --- Timezone data (ZoneInfo for schedules, SOS times and birthdays) ---
+tzdata==2026.2
+
+# --- Production WSGI ---
+gunicorn==26.2.0
